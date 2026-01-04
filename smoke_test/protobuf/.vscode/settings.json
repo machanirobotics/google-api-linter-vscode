@@ -1,0 +1,13 @@
+{
+  "googleApiLinter.protoPath": [
+    "${workspaceFolder}/smoke_test/protobuf",
+    "${workspaceFolder}/smoke_test/protobuf/googleapis"
+  ],
+  "protoc": {
+    "path": "protoc",
+    "options": [
+      "--proto_path=${workspaceFolder}/smoke_test/protobuf",
+      "--proto_path=${workspaceFolder}/vscode-googleapi-linter/smoke_test/protobuf/googleapis"
+    ]
+  }
+}

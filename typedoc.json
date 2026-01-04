@@ -1,0 +1,19 @@
+{
+  "entryPointStrategy": "expand",
+  "entryPoints": ["src"],
+  "out": "docs",
+  "exclude": [
+    "**/node_modules/**",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ],
+  "excludePrivate": false,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "readme": "README.md",
+  "name": "Google API Linter for VSCode",
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "plugin": [],
+  "theme": "default"
+}

@@ -34,10 +34,7 @@ graph TB
     D -->|Shows Documentation| A
     
     E -->|Triggers| C
-    
-    style G fill:#e1f5ff
-    style H fill:#fff4e1
-    style A fill:#f0f0f0
+   
 ```
 
 ## How It Works

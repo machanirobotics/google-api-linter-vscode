@@ -1,0 +1,6 @@
+{
+  "gapi.protoPath": [
+    "${workspaceFolder}/.gapi/googleapis"
+  ],
+  "gapi.configPath": "${workspaceFolder}/.api-linter.yaml"
+}

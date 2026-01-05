@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as cp from 'child_process';
+import { promisify } from 'util';
 import { ApiLinterProvider } from './linterProvider';
 import { CONFIG_TEMPLATE, CONFIG_FILE_NAME } from './constants';
 import { getActiveProtoEditor, findProtoFiles } from './utils/fileUtils';
+
+const exec = promisify(cp.exec);
 
 /**
  * Creates the command to lint the currently active proto file.
@@ -83,6 +88,102 @@ export const createRestartCommand = (
       }
       
       vscode.window.showInformationMessage('Google API Linter restart complete!');
+    }
+  );
+};
+
+/**
+ * Creates the command to update googleapis commit in workspace .gapi directory.
+ * @returns Disposable command registration
+ */
+export const createUpdateGoogleapisCommitCommand = () => {
+  return vscode.commands.registerCommand(
+    'googleApiLinter.updateGoogleapisCommit',
+    async () => {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        vscode.window.showErrorMessage('No workspace folder open');
+        return;
+      }
+
+      const commitHash = await vscode.window.showInputBox({
+        prompt: 'Enter googleapis commit hash (leave empty for latest)',
+        placeHolder: 'e.g., abc123def456 or leave empty',
+        validateInput: (value) => {
+          if (value && !/^[a-f0-9]{7,40}$/i.test(value)) {
+            return 'Invalid commit hash format. Must be 7-40 hexadecimal characters.';
+          }
+          return null;
+        }
+      });
+
+      if (commitHash === undefined) {
+        return;
+      }
+
+      const gapiDir = path.join(workspaceFolders[0].uri.fsPath, '.gapi');
+      const googleapisDir = path.join(gapiDir, 'googleapis');
+
+      try {
+        await vscode.window.withProgress({
+          location: vscode.ProgressLocation.Notification,
+          title: 'Downloading googleapis',
+          cancellable: false
+        }, async (progress) => {
+          progress.report({ message: 'Checking buf CLI...' });
+          
+          try {
+            await exec('buf --version');
+          } catch {
+            vscode.window.showErrorMessage(
+              'buf CLI not found. Please install it first: https://buf.build/docs/installation'
+            );
+            return;
+          }
+
+          progress.report({ message: 'Creating .gapi directory...' });
+          await vscode.workspace.fs.createDirectory(vscode.Uri.file(gapiDir));
+
+          progress.report({ message: 'Exporting googleapis protos...' });
+          const bufRef = commitHash 
+            ? `buf.build/googleapis/googleapis:${commitHash}`
+            : 'buf.build/googleapis/googleapis';
+          const command = `buf export ${bufRef} --output "${googleapisDir}"`;
+          
+          try {
+            await exec(command);
+          } catch (error) {
+            throw new Error(`Failed to export googleapis: ${error}. Check if commit hash is valid.`);
+          }
+
+          const commitInfo = commitHash ? ` (commit: ${commitHash})` : ' (latest)';
+          vscode.window.showInformationMessage(
+            `googleapis${commitInfo} downloaded to ${path.relative(workspaceFolders[0].uri.fsPath, googleapisDir)}`
+          );
+
+          const updateConfig = await vscode.window.showInformationMessage(
+            'Update workspace settings to use downloaded googleapis?',
+            'Yes', 'No'
+          );
+
+          if (updateConfig === 'Yes') {
+            const config = vscode.workspace.getConfiguration('gapi');
+            const currentProtoPaths = config.get<string[]>('protoPath', []);
+            const newPath = '${workspaceFolder}/.gapi/googleapis';
+            
+            if (!currentProtoPaths.includes(newPath)) {
+              await config.update(
+                'protoPath',
+                [...currentProtoPaths, newPath],
+                vscode.ConfigurationTarget.Workspace
+              );
+              vscode.window.showInformationMessage('Workspace settings updated!');
+            }
+          }
+        });
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to download googleapis: ${error}`);
+      }
     }
   );
 };

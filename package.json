@@ -1,9 +1,10 @@
 {
   "name": "google-api-linter",
   "displayName": "Google API Linter",
-  "description": "Run Google API linter on proto files while editing",
-  "version": "1.0.0",
+  "description": "Google API Linter for VS Code - Production Grade API Design",
+  "version": "1.1.0",
   "publisher": "machanirobotics",
+  "icon": "picon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/machanirobotics/google-api-linter-vscode"
@@ -16,8 +17,6 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:proto3",
-    "onLanguage:protobuf",
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
@@ -31,33 +30,41 @@
         ],
         "extensions": [
           ".proto"
-        ]
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "proto3",
+        "scopeName": "source.proto",
+        "path": "./syntaxes/proto3.tmLanguage.json"
       }
     ],
     "configuration": {
       "title": "Google API Linter",
       "properties": {
-        "googleApiLinter.binaryPath": {
+        "gapi.binaryPath": {
           "type": "string",
           "default": "api-linter",
           "description": "Path to the api-linter binary. If not set, assumes 'api-linter' is in PATH."
         },
-        "googleApiLinter.enableOnSave": {
+        "gapi.enableOnSave": {
           "type": "boolean",
           "default": true,
           "description": "Run linter automatically when saving proto files."
         },
-        "googleApiLinter.enableOnType": {
+        "gapi.enableOnType": {
           "type": "boolean",
           "default": false,
           "description": "Run linter automatically while typing (may impact performance)."
         },
-        "googleApiLinter.configPath": {
+        "gapi.configPath": {
           "type": "string",
           "default": "",
           "description": "Path to api-linter configuration file (.api-linter.yaml)."
         },
-        "googleApiLinter.protoPath": {
+        "gapi.protoPath": {
           "type": "array",
           "default": [],
           "description": "Additional folders for searching proto imports. May be specified multiple times.",
@@ -65,7 +72,7 @@
             "type": "string"
           }
         },
-        "googleApiLinter.disableRules": {
+        "gapi.disableRules": {
           "type": "array",
           "default": [],
           "description": "Disable specific rules by name (e.g., 'core::0192::has-comments').",
@@ -73,7 +80,7 @@
             "type": "string"
           }
         },
-        "googleApiLinter.enableRules": {
+        "gapi.enableRules": {
           "type": "array",
           "default": [],
           "description": "Enable specific rules by name.",
@@ -81,7 +88,7 @@
             "type": "string"
           }
         },
-        "googleApiLinter.descriptorSetIn": {
+        "gapi.descriptorSetIn": {
           "type": "array",
           "default": [],
           "description": "File containing a FileDescriptorSet for searching proto imports.",
@@ -89,12 +96,12 @@
             "type": "string"
           }
         },
-        "googleApiLinter.ignoreCommentDisables": {
+        "gapi.ignoreCommentDisables": {
           "type": "boolean",
           "default": false,
           "description": "If true, disable comments in proto files will be ignored."
         },
-        "googleApiLinter.setExitStatus": {
+        "gapi.setExitStatus": {
           "type": "boolean",
           "default": false,
           "description": "Return exit status 1 when lint errors are found."
@@ -117,6 +124,10 @@
       {
         "command": "googleApiLinter.restart",
         "title": "Google API Linter: Restart"
+      },
+      {
+        "command": "googleApiLinter.updateGoogleapisCommit",
+        "title": "Google API Linter: Update googleapis Commit"
       }
     ]
   },
@@ -132,10 +143,12 @@
     "test:local": "npm run compile && code --extensionDevelopmentPath=$PWD"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^9.0.1",
+    "unzipper": "^0.12.3"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
+    "@types/unzipper": "^0.10.10",
     "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",

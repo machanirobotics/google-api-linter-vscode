@@ -28,10 +28,15 @@ export class ApiLinterProvider {
   /**
    * Lints a single document and updates diagnostics.
    * @param document - The document to lint
+   * @param saveFirst - Whether to save the document before linting (for unsaved changes)
    */
-  public async lintDocument(document: vscode.TextDocument): Promise<void> {
+  public async lintDocument(document: vscode.TextDocument, saveFirst: boolean = false): Promise<void> {
     if (!document.fileName.endsWith('.proto')) {
       return;
+    }
+
+    if (saveFirst && document.isDirty) {
+      await document.save();
     }
 
     const filePath = document.uri.fsPath;
@@ -57,7 +62,7 @@ export class ApiLinterProvider {
    * @returns Linter options object
    */
   private getLinterOptions(): LinterOptions {
-    const config = vscode.workspace.getConfiguration('googleApiLinter');
+    const config = vscode.workspace.getConfiguration('gapi');
     return {
       configPath: config.get<string>('configPath', ''),
       protoPath: config.get<string[]>('protoPath', []),

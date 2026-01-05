@@ -5,11 +5,16 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 ## Features
 
 - **Real-time Linting**: Automatically validates `.proto` files as you type or save
+- **Syntax Highlighting**: Full Protocol Buffers syntax highlighting with TextMate grammar
 - **Inline Diagnostics**: Displays linting errors and warnings directly in the editor
 - **Hover Documentation**: Shows detailed rule information when hovering over diagnostics
+- **Automatic Binary Management**: Downloads and updates api-linter binary automatically
+- **Automatic googleapis Integration**: Downloads googleapis protos on first use - no configuration needed
+- **Smart Proto Path Detection**: Automatically detects workspace root and `.gapi/googleapis` directories
 - **Workspace Linting**: Lint all proto files in your workspace with a single command
+- **Update Notifications**: Prompts when new api-linter versions are available
 - **Configurable Rules**: Enable or disable specific linting rules via configuration
-- **Custom Proto Paths**: Support for custom import paths and descriptor sets
+- **Cross-Platform**: Works on Windows, macOS, and Linux
 
 ## Architecture
 
@@ -80,8 +85,10 @@ When a `.proto` file is opened or the extension starts:
 - Registers commands and document event listeners
 
 #### 2. Binary Manager
-Manages the `api-linter` binary execution:
-- Locates the binary (custom path or system PATH)
+Manages the `api-linter` binary and googleapis:
+- Automatically downloads api-linter binary to `~/.gapi/` on first use
+- Automatically downloads googleapis from GitHub
+- Checks for updates every 10 days and prompts user
 - Constructs command-line arguments from configuration
 - Handles process spawning and output streaming
 - Parses JSON output into structured diagnostics
@@ -103,20 +110,7 @@ Provides contextual information:
 
 ### Prerequisites
 
-Install the `api-linter` binary on your system:
-
-**macOS (Homebrew)**
-```bash
-brew install api-linter
-```
-
-**Linux/macOS (Go)**
-```bash
-go install github.com/googleapis/api-linter/cmd/api-linter@latest
-```
-
-**Manual Installation**
-Download the binary from [GitHub Releases](https://github.com/googleapis/api-linter/releases) and add it to your PATH.
+**None!** The extension automatically downloads and manages the `api-linter` binary and googleapis protos for you.
 
 ### Extension Installation
 
@@ -139,29 +133,29 @@ Configure the extension through VS Code settings (File > Preferences > Settings 
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `googleApiLinter.binaryPath` | string | `"api-linter"` | Path to the api-linter binary |
-| `googleApiLinter.enableOnSave` | boolean | `true` | Run linter when saving proto files |
-| `googleApiLinter.enableOnType` | boolean | `false` | Run linter while typing (may impact performance) |
-| `googleApiLinter.configPath` | string | `""` | Path to `.api-linter.yaml` configuration file |
-| `googleApiLinter.protoPath` | array | `[]` | Additional proto import paths |
-| `googleApiLinter.disableRules` | array | `[]` | Rules to disable (e.g., `["core::0192::has-comments"]`) |
-| `googleApiLinter.enableRules` | array | `[]` | Rules to explicitly enable |
-| `googleApiLinter.descriptorSetIn` | array | `[]` | FileDescriptorSet files for imports |
-| `googleApiLinter.ignoreCommentDisables` | boolean | `false` | Ignore disable comments in proto files |
-| `googleApiLinter.setExitStatus` | boolean | `false` | Return exit status 1 on lint errors |
+| `gapi.binaryPath` | string | `"api-linter"` | Path to the api-linter binary |
+| `gapi.enableOnSave` | boolean | `true` | Run linter when saving proto files |
+| `gapi.enableOnType` | boolean | `false` | Run linter while typing (may impact performance) |
+| `gapi.configPath` | string | `""` | Path to `.api-linter.yaml` configuration file |
+| `gapi.protoPath` | array | `[]` | Additional proto import paths |
+| `gapi.disableRules` | array | `[]` | Rules to disable (e.g., `["core::0192::has-comments"]`) |
+| `gapi.enableRules` | array | `[]` | Rules to explicitly enable |
+| `gapi.descriptorSetIn` | array | `[]` | FileDescriptorSet files for imports |
+| `gapi.ignoreCommentDisables` | boolean | `false` | Ignore disable comments in proto files |
+| `gapi.setExitStatus` | boolean | `false` | Return exit status 1 on lint errors |
 
 ### Example Configuration
 
 ```json
 {
-  "googleApiLinter.binaryPath": "/usr/local/bin/api-linter",
-  "googleApiLinter.enableOnSave": true,
-  "googleApiLinter.enableOnType": false,
-  "googleApiLinter.protoPath": [
+  "gapi.binaryPath": "/usr/local/bin/api-linter",
+  "gapi.enableOnSave": true,
+  "gapi.enableOnType": false,
+  "gapi.protoPath": [
     "${workspaceFolder}/proto",
     "${workspaceFolder}/third_party/googleapis"
   ],
-  "googleApiLinter.disableRules": [
+  "gapi.disableRules": [
     "core::0192::has-comments"
   ]
 }
@@ -173,8 +167,8 @@ For project-specific settings, create `.vscode/settings.json`:
 
 ```json
 {
-  "googleApiLinter.configPath": "${workspaceFolder}/.api-linter.yaml",
-  "googleApiLinter.protoPath": [
+  "gapi.configPath": "${workspaceFolder}/.api-linter.yaml",
+  "gapi.protoPath": [
     "${workspaceFolder}/proto",
     "${workspaceFolder}/third_party"
   ]
@@ -190,14 +184,15 @@ Access commands via Command Palette (Cmd+Shift+P / Ctrl+Shift+P):
 - **Google API Linter: Lint Current File** - Lint the currently open proto file
 - **Google API Linter: Lint All Proto Files in Workspace** - Lint all `.proto` files in workspace
 - **Google API Linter: Create Config File** - Generate a `.api-linter.yaml` template
+- **Google API Linter: Update googleapis Commit** - Download specific googleapis commit to workspace `.gapi/`
 - **Google API Linter: Restart** - Restart the linter (useful after config changes)
 
 ### Automatic Linting
 
 By default, the extension lints proto files:
 - When opening a proto file
-- When saving a proto file (if `enableOnSave` is true)
-- When typing (if `enableOnType` is true)
+- When saving a proto file (if `gapi.enableOnSave` is true)
+- When typing (if `gapi.enableOnType` is true, with 1-second debounce and auto-save)
 
 ### Viewing Diagnostics
 
@@ -235,32 +230,33 @@ Refer to the [api-linter documentation](https://linter.aip.dev/) for available r
 **Error**: `api-linter binary not found`
 
 **Solution**:
-1. Verify `api-linter` is installed: `which api-linter`
-2. Set `googleApiLinter.binaryPath` to the full path
-3. Ensure the binary has execute permissions: `chmod +x /path/to/api-linter`
+The extension automatically downloads the binary on first use. If you see this error:
+1. Check your internet connection
+2. Ensure `~/.gapi/` directory is writable
+3. Alternatively, set `gapi.binaryPath` to a custom binary location
 
 ### Import Errors
 
 **Error**: `Import "google/api/annotations.proto" was not found`
 
 **Solution**:
-1. Export Google API protos locally:
-   ```bash
-   buf export buf.build/googleapis/googleapis --output third_party/googleapis
-   ```
-2. Configure proto path:
+The extension automatically downloads googleapis on first use. If imports still fail:
+1. Check that `~/.gapi/googleapis/` exists and contains proto files
+2. For workspace-specific googleapis version, run: **Google API Linter: Update googleapis Commit**
+3. Manually add proto paths if needed:
    ```json
    {
-     "googleApiLinter.protoPath": ["${workspaceFolder}/third_party/googleapis"]
+     "gapi.protoPath": ["${workspaceFolder}/.gapi/googleapis"]
    }
    ```
 
 ### Performance Issues
 
 If linting is slow or causes lag:
-1. Disable `enableOnType` (keep `enableOnSave` enabled)
-2. Use `.api-linter.yaml` to disable expensive rules
-3. Exclude large proto files or directories
+1. Disable `gapi.enableOnType` (keep `gapi.enableOnSave` enabled)
+2. The extension uses 1-second debouncing for on-type linting to minimize performance impact
+3. Use `.api-linter.yaml` to disable expensive rules
+4. Exclude large proto files or directories
 
 ## Development
 

@@ -4,6 +4,27 @@ import * as fs from 'fs';
 import { LinterOptions, LinterOutput, LinterProblem } from '../types';
 
 /**
+ * Resolves workspace variables in a path string.
+ * @param pathStr - Path string potentially containing variables like ${workspaceFolder}
+ * @param filePath - Current file path for context
+ * @returns Resolved absolute path
+ */
+const resolveWorkspaceVariables = (pathStr: string, filePath: string): string => {
+  let resolved = pathStr;
+
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+    const workspacePath = workspaceFolder?.uri.fsPath || workspaceFolders[0].uri.fsPath;
+    
+    resolved = resolved.replace(/\$\{workspaceFolder\}/g, workspacePath);
+    resolved = resolved.replace(/\$\{workspaceRoot\}/g, workspacePath);
+  }
+
+  return path.resolve(resolved);
+};
+
+/**
  * Builds command-line arguments for the api-linter binary.
  * @param filePath - Path to the proto file to lint
  * @param options - Linter configuration options
@@ -15,8 +36,11 @@ export const buildLinterArgs = (
 ): { args: string[]; workingDir: string; fileName: string } => {
   const args: string[] = [];
 
-  if (options.configPath && fs.existsSync(options.configPath)) {
-    args.push('--config', options.configPath);
+  if (options.configPath) {
+    const resolvedConfigPath = resolveWorkspaceVariables(options.configPath, filePath);
+    if (fs.existsSync(resolvedConfigPath)) {
+      args.push('--config', resolvedConfigPath);
+    }
   }
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
@@ -25,8 +49,31 @@ export const buildLinterArgs = (
   
   args.push('--proto-path', workingDir);
   
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+    const workspaceRoot = workspaceFolder?.uri.fsPath || workspaceFolders[0].uri.fsPath;
+    
+    if (workspaceRoot !== workingDir && fs.existsSync(workspaceRoot)) {
+      args.push('--proto-path', workspaceRoot);
+    }
+    
+    const workspaceGapiDir = path.join(workspaceRoot, '.gapi', 'googleapis');
+    if (fs.existsSync(workspaceGapiDir)) {
+      args.push('--proto-path', workspaceGapiDir);
+    }
+  }
+  
+  const homeGapiDir = path.join(require('os').homedir(), '.gapi', 'googleapis');
+  if (fs.existsSync(homeGapiDir)) {
+    args.push('--proto-path', homeGapiDir);
+  }
+  
   options.protoPath.forEach(protoPath => {
-    args.push('--proto-path', protoPath);
+    const resolvedPath = resolveWorkspaceVariables(protoPath, filePath);
+    if (fs.existsSync(resolvedPath)) {
+      args.push('--proto-path', resolvedPath);
+    }
   });
   
   options.disableRules.forEach(rule => {

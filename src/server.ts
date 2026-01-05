@@ -106,7 +106,7 @@ function getDocumentSettings(resource: string): Thenable<ExtensionSettings> {
   if (!result) {
     result = connection.workspace.getConfiguration({
       scopeUri: resource,
-      section: 'googleApiLinter'
+      section: 'gapi'
     });
     documentSettings.set(resource, result);
   }

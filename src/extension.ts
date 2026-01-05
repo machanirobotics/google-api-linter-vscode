@@ -8,10 +8,12 @@ import {
   createLintWorkspaceCommand,
   createConfigCommand,
   createRestartCommand,
+  createUpdateGoogleapisCommitCommand,
 } from './commands';
 
 let diagnosticCollection: vscode.DiagnosticCollection;
 let linterProvider: ApiLinterProvider;
+let lintTimeout: NodeJS.Timeout | undefined;
 
 /**
  * Activates the Google API Linter extension.
@@ -33,7 +35,8 @@ export function activate(context: vscode.ExtensionContext) {
     createLintCurrentFileCommand(linterProvider),
     createLintWorkspaceCommand(linterProvider),
     createConfigCommand(),
-    createRestartCommand(diagnosticCollection, linterProvider)
+    createRestartCommand(diagnosticCollection, linterProvider),
+    createUpdateGoogleapisCommitCommand()
   );
 
   registerDocumentListeners(context, linterProvider);
@@ -63,7 +66,7 @@ function registerDocumentListeners(
   context: vscode.ExtensionContext,
   linterProvider: ApiLinterProvider
 ): void {
-  const config = vscode.workspace.getConfiguration('googleApiLinter');
+  const config = vscode.workspace.getConfiguration('gapi');
   const enableOnSave = config.get<boolean>('enableOnSave', true);
   const enableOnType = config.get<boolean>('enableOnType', false);
 
@@ -81,7 +84,13 @@ function registerDocumentListeners(
     context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument(async (event) => {
         if (isProtoFile(event.document.fileName)) {
-          await linterProvider.lintDocument(event.document);
+          if (lintTimeout) {
+            clearTimeout(lintTimeout);
+          }
+          
+          lintTimeout = setTimeout(async () => {
+            await linterProvider.lintDocument(event.document, true);
+          }, 1000);
         }
       })
     );
@@ -95,7 +104,7 @@ function registerDocumentListeners(
       }
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('googleApiLinter')) {
+      if (e.affectsConfiguration('gapi')) {
         vscode.window.showInformationMessage(
           `${EXTENSION_NAME} configuration changed. Reload window for changes to take effect.`
         );

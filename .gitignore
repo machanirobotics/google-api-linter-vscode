@@ -5,3 +5,5 @@ out
 .vscode-test/
 smoke_test/protobuf/googleapis/
 smoke_test/protobuf/gen/
+.gapi/
+t

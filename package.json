@@ -2,7 +2,7 @@
   "name": "google-api-linter",
   "displayName": "Google API Linter",
   "description": "Google API Linter for VS Code - Production Grade API Design",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "publisher": "machanirobotics",
   "icon": "picon.png",
   "repository": {
@@ -137,18 +137,17 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
     "lint": "eslint src --ext ts",
-    "package": "vsce package --no-dependencies",
-    "publish": "vsce publish --no-dependencies",
+    "package": "vsce package",
+    "publish": "vsce publish",
     "build:local": "npm run compile && npm run package",
     "test:local": "npm run compile && code --extensionDevelopmentPath=$PWD"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "unzipper": "^0.12.3"
+    "fast-glob": "^3.3.3",
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
-    "@types/unzipper": "^0.10.10",
     "@types/vscode": "^1.75.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",

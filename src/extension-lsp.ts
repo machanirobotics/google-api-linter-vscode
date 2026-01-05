@@ -57,6 +57,8 @@ function createServerOptions(serverModule: string): ServerOptions {
  * @returns Client options configuration
  */
 function createClientOptions(): LanguageClientOptions {
+  const outputChannel = vscode.window.createOutputChannel('Google API Linter Language Server');
+  
   return {
     documentSelector: [
       { scheme: 'file', language: 'proto3' },
@@ -65,7 +67,9 @@ function createClientOptions(): LanguageClientOptions {
     ],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher(PROTO_FILE_PATTERN)
-    }
+    },
+    outputChannel: outputChannel,
+    revealOutputChannelOn: 4 // RevealOutputChannelOn.Never - only show when user opens it
   };
 }
 

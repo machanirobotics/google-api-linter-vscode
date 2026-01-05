@@ -148,7 +148,7 @@ const createDiagnosticFromProblem = (problem: LinterProblem): vscode.Diagnostic 
   const diagnostic = new vscode.Diagnostic(
     new vscode.Range(startLine, startChar, endLine, endChar),
     problem.message,
-    vscode.DiagnosticSeverity.Warning
+    vscode.DiagnosticSeverity.Error
   );
   
   diagnostic.source = 'google-api-linter';

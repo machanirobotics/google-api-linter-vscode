@@ -46,6 +46,10 @@ export class ApiLinterProvider {
       const binaryPath = await this.binaryManager.ensureBinary();
       this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
       
+      // Ensure googleapis and protobuf are downloaded (will skip if already present and up-to-date)
+      await this.binaryManager.ensureGoogleapis();
+      await this.binaryManager.ensureProtobuf();
+      
       const options = this.getLinterOptions();
       const diagnostics = await this.runLinter(binaryPath, filePath, options);
       

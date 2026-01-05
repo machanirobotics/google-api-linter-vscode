@@ -114,7 +114,13 @@ message UpdateTodoRequest {
 
 // Request message for deleting a todo item.
 message DeleteTodoRequest {
-  string name = 1;
+  // The resource name of the todo to delete.
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {
+      type: "machanirobotics.service.todo.v1/Todo"
+    }
+  ];
 }
 
 // Priority levels for todo items.

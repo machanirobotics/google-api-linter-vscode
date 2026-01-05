@@ -3,8 +3,11 @@
 src/**
 .gitignore
 .yarnrc
+smoke_test/protobuf/googleapis/
+smoke_test/protobuf/gen/
+vscode-proto3/**
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
 **/*.ts
-node_modules/**
+!node_modules/fast-glob/**

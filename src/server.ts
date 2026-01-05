@@ -49,6 +49,7 @@ let hasWorkspaceFolderCapability = false;
 let globalSettings: ExtensionSettings = defaultSettings;
 
 connection.onInitialize((params: InitializeParams) => {
+  connection.console.log('Language Server initializing...');
   const capabilities = params.capabilities;
 
   hasConfigurationCapability = !!(
@@ -57,6 +58,8 @@ connection.onInitialize((params: InitializeParams) => {
   hasWorkspaceFolderCapability = !!(
     capabilities.workspace && !!capabilities.workspace.workspaceFolders
   );
+  
+  connection.console.log(`Configuration capability: ${hasConfigurationCapability}`);
 
   const result: InitializeResult = {
     capabilities: {
@@ -134,13 +137,18 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     return;
   }
 
+  connection.console.log(`Validating document: ${filePath}`);
+
   try {
     const binaryManager = new BinaryManager({
       appendLine: (msg: string) => connection.console.log(msg)
     } as any);
     
     const binaryPath = await binaryManager.ensureBinary();
+    connection.console.log(`Using binary: ${binaryPath}`);
+    
     const diagnostics = await runLinter(binaryPath, filePath, settings);
+    connection.console.log(`Found ${diagnostics.length} diagnostic(s) for ${filePath}`);
     
     connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
   } catch (error) {
@@ -209,7 +217,7 @@ async function runLinter(
       try {
         const vscDiagnostics = parseLinterOutput(stdout);
         const diagnostics = vscDiagnostics.map(d => ({
-          severity: DiagnosticSeverity.Warning,
+          severity: DiagnosticSeverity.Error,
           range: d.range,
           message: d.message,
           source: d.source,

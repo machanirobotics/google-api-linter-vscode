@@ -62,17 +62,15 @@ export interface LinterOutput {
  */
 export interface LinterOptions {
   /** Path to the .api-linter.yaml configuration file */
-  configPath: string;
+  configPath?: string;
   /** Additional proto import paths */
   protoPath: string[];
   /** Rules to disable */
   disableRules: string[];
   /** Rules to enable */
   enableRules: string[];
-  /** Paths to descriptor set files */
-  descriptorSetIn: string[];
-  /** Whether to ignore comment-based rule disables */
-  ignoreCommentDisables: boolean;
+  /** Output format */
+  outputFormat?: string;
   /** Whether to set exit status based on findings */
   setExitStatus: boolean;
 }

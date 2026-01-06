@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
 import { promisify } from 'util';
 import { ApiLinterProvider } from './linterProvider';
 import { CONFIG_TEMPLATE, CONFIG_FILE_NAME } from './constants';
@@ -183,6 +185,65 @@ export const createUpdateGoogleapisCommitCommand = () => {
         });
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to download googleapis: ${error}`);
+      }
+    }
+  );
+};
+
+/**
+ * Creates the command to reinstall all Google API Linter dependencies.
+ * Deletes the .gapi directory and reinstalls api-linter, googleapis, and protobuf.
+ * @param binaryManager - The binary manager instance
+ * @returns Disposable command registration
+ */
+export const createReinstallCommand = (binaryManager: any) => {
+  return vscode.commands.registerCommand(
+    'googleApiLinter.reinstallAll',
+    async () => {
+      const confirm = await vscode.window.showWarningMessage(
+        'This will delete the .gapi directory and reinstall all dependencies (api-linter, googleapis, protobuf). Continue?',
+        { modal: true },
+        'Yes',
+        'No'
+      );
+
+      if (confirm !== 'Yes') {
+        return;
+      }
+
+      try {
+        const gapiDir = path.join(os.homedir(), '.gapi');
+        
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Reinstalling Google API Linter dependencies',
+            cancellable: false
+          },
+          async (progress) => {
+            // Delete .gapi directory
+            progress.report({ message: 'Deleting .gapi directory...' });
+            if (fs.existsSync(gapiDir)) {
+              await fs.promises.rm(gapiDir, { recursive: true, force: true });
+            }
+
+            // Reinstall api-linter
+            progress.report({ message: 'Downloading api-linter binary...' });
+            await binaryManager.ensureBinary();
+
+            // Reinstall googleapis
+            progress.report({ message: 'Downloading googleapis...' });
+            await binaryManager.ensureGoogleapis();
+
+            // Reinstall protobuf
+            progress.report({ message: 'Downloading protobuf...' });
+            await binaryManager.ensureProtobuf();
+
+            vscode.window.showInformationMessage('Successfully reinstalled all Google API Linter dependencies!');
+          }
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to reinstall dependencies: ${error}`);
       }
     }
   );

@@ -10,6 +10,7 @@ import {
   createConfigCommand,
   createRestartCommand,
   createUpdateGoogleapisCommitCommand,
+  createReinstallCommand,
 } from './commands';
 
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -55,12 +56,13 @@ export async function activate(context: vscode.ExtensionContext) {
       outputChannel,
       registerHoverProvider(diagnosticCollection),
       registerDefinitionProvider(),
-      createLintCurrentFileCommand(linterProvider),
-      createLintWorkspaceCommand(linterProvider),
-      createConfigCommand(),
-      createRestartCommand(diagnosticCollection, linterProvider),
-      createUpdateGoogleapisCommitCommand()
     );
+    context.subscriptions.push(createLintCurrentFileCommand(linterProvider));
+    context.subscriptions.push(createLintWorkspaceCommand(linterProvider));
+    context.subscriptions.push(createConfigCommand());
+    context.subscriptions.push(createRestartCommand(diagnosticCollection, linterProvider));
+    context.subscriptions.push(createUpdateGoogleapisCommitCommand());
+    context.subscriptions.push(createReinstallCommand(binaryManager));
 
     registerDocumentListeners(context, linterProvider);
     lintActiveProtoFile();

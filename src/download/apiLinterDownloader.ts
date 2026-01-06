@@ -139,32 +139,50 @@ export class ApiLinterDownloader {
   }
 
   public async downloadBinary(): Promise<void> {
-    this.outputChannel.appendLine('Downloading api-linter binary...');
+    try {
+      this.outputChannel.appendLine('Downloading api-linter binary...');
 
-    const release: any = await fetchJson(GITHUB_API);
-    const version = release.tag_name;
-    const asset = this.findAssetForPlatform(release.assets);
+      const release: any = await fetchJson(GITHUB_API);
+      const version = release.tag_name;
+      this.outputChannel.appendLine(`Latest version: ${version}`);
+      
+      const asset = this.findAssetForPlatform(release.assets);
 
-    if (!asset) {
-      throw new Error(`No compatible binary found for ${getPlatform()}-${getArch()}`);
+      if (!asset) {
+        const platform = getPlatform();
+        const arch = getArch();
+        throw new Error(`No compatible binary found for ${platform}-${arch}. Available assets: ${release.assets.map((a: any) => a.name).join(', ')}`);
+      }
+
+      const downloadUrl = asset.browser_download_url;
+      this.outputChannel.appendLine(`Downloading from: ${downloadUrl}`);
+      
+      const tarPath = path.join(this.GAPI_DIR, 'api-linter.tar.gz');
+
+      await downloadFile(downloadUrl, tarPath, fs);
+      this.outputChannel.appendLine('Download complete. Extracting...');
+
+      await this.extractBinary(tarPath);
+      
+      // Verify binary was extracted
+      if (!fs.existsSync(this.BINARY_PATH)) {
+        throw new Error('Binary extraction failed - file not found after extraction');
+      }
+      
+      await this.updateMetadata(version);
+      this.outputChannel.appendLine(`Binary downloaded and installed successfully at ${this.BINARY_PATH}`);
+    } catch (error) {
+      this.outputChannel.appendLine(`Failed to download binary: ${error}`);
+      throw error;
     }
-
-    const downloadUrl = asset.browser_download_url;
-    const tarPath = path.join(this.GAPI_DIR, 'api-linter.tar.gz');
-
-    await downloadFile(downloadUrl, tarPath, fs);
-    this.outputChannel.appendLine('Download complete. Extracting...');
-
-    await this.extractBinary(tarPath);
-    await this.updateMetadata(version);
-    this.outputChannel.appendLine('Binary downloaded and installed successfully');
   }
 
   private findAssetForPlatform(assets: any[]): any {
     const platform = getPlatform();
     const arch = getArch();
-    const assetName = `api-linter-${platform}-${arch}.tar.gz`;
-    return assets.find((asset: any) => asset.name === assetName);
+    // Asset name includes version: api-linter-2.1.0-darwin-arm64.tar.gz
+    const assetPattern = `${platform}-${arch}.tar.gz`;
+    return assets.find((asset: any) => asset.name.includes(assetPattern));
   }
 
   private async extractBinary(tarPath: string): Promise<void> {

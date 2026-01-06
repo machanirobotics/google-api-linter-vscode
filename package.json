@@ -2,7 +2,7 @@
   "name": "google-api-linter",
   "displayName": "Google API Linter",
   "description": "Google API Linter for VS Code - Production Grade API Design",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "publisher": "machanirobotics",
   "icon": "picon.png",
   "repository": {
@@ -17,7 +17,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "workspaceContains:**/workspace.protobuf.yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -128,19 +129,23 @@
       {
         "command": "googleApiLinter.updateGoogleapisCommit",
         "title": "Google API Linter: Update googleapis Commit"
+      },
+      {
+        "command": "googleApiLinter.reinstallAll",
+        "title": "Google API Linter: Reinstall All Dependencies"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "bun run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile",
+    "pretest": "bun run compile",
     "lint": "eslint src --ext ts",
     "package": "vsce package",
     "publish": "vsce publish",
-    "build:local": "npm run compile && npm run package",
-    "test:local": "npm run compile && code --extensionDevelopmentPath=$PWD"
+    "build:local": "bun run compile && bun run package",
+    "test:local": "bun run compile && code --extensionDevelopmentPath=$PWD"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",

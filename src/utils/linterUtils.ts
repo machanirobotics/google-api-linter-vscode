@@ -84,14 +84,6 @@ export const buildLinterArgs = (
     args.push('--enable-rule', rule);
   });
   
-  options.descriptorSetIn.forEach(descriptorSet => {
-    args.push('--descriptor-set-in', descriptorSet);
-  });
-  
-  if (options.ignoreCommentDisables) {
-    args.push('--ignore-comment-disables');
-  }
-  
   if (options.setExitStatus) {
     args.push('--set-exit-status');
   }
@@ -105,9 +97,10 @@ export const buildLinterArgs = (
 /**
  * Parses JSON output from the api-linter into VS Code diagnostics.
  * @param output - Raw JSON output from the linter
+ * @param outputChannel - Optional output channel for logging
  * @returns Array of VS Code Diagnostic objects
  */
-export const parseLinterOutput = (output: string): vscode.Diagnostic[] => {
+export const parseLinterOutput = (output: string, outputChannel?: vscode.OutputChannel): vscode.Diagnostic[] => {
   const diagnostics: vscode.Diagnostic[] = [];
 
   if (!output || output.trim() === '') {
@@ -115,7 +108,39 @@ export const parseLinterOutput = (output: string): vscode.Diagnostic[] => {
   }
 
   try {
-    const results: LinterOutput[] = JSON.parse(output);
+    // Extract JSON array from output - linter might output non-JSON text before/after
+    let jsonOutput = output.trim();
+    
+    // Find the first '[' which starts the JSON array
+    const jsonStart = jsonOutput.indexOf('[');
+    if (jsonStart === -1) {
+      const msg = `No JSON array found in linter output. First 200 chars: ${output.substring(0, 200)}`;
+      console.error(msg);
+      if (outputChannel) {
+        outputChannel.appendLine(`ERROR: ${msg}`);
+      }
+      return diagnostics;
+    }
+    
+    // Find the last ']' which ends the JSON array
+    const jsonEnd = jsonOutput.lastIndexOf(']');
+    if (jsonEnd === -1 || jsonEnd < jsonStart) {
+      const msg = `Invalid JSON array in linter output. First 200 chars: ${output.substring(0, 200)}`;
+      console.error(msg);
+      if (outputChannel) {
+        outputChannel.appendLine(`ERROR: ${msg}`);
+      }
+      return diagnostics;
+    }
+    
+    // Extract only the JSON part
+    jsonOutput = jsonOutput.substring(jsonStart, jsonEnd + 1);
+    
+    if (outputChannel) {
+      outputChannel.appendLine(`Extracted JSON (first 200 chars): ${jsonOutput.substring(0, 200)}`);
+    }
+    
+    const results: LinterOutput[] = JSON.parse(jsonOutput);
     
     results.forEach(result => {
       if (!result.problems || result.problems.length === 0) {
@@ -128,7 +153,11 @@ export const parseLinterOutput = (output: string): vscode.Diagnostic[] => {
       });
     });
   } catch (error) {
-    console.error('Error parsing linter output:', error);
+    const msg = `Error parsing linter output: ${error}. First 200 chars: ${output.substring(0, 200)}`;
+    console.error(msg);
+    if (outputChannel) {
+      outputChannel.appendLine(`ERROR: ${msg}`);
+    }
   }
 
   return diagnostics;

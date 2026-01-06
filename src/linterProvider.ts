@@ -1,9 +1,10 @@
-import * as vscode from 'vscode';
-import * as cp from 'child_process';
-import { BinaryManager } from './binaryManager';
-import { LinterOptions } from './types';
-import { buildLinterArgs, parseLinterOutput } from './utils/linterUtils';
-import { findProtoFiles } from './utils/fileUtils';
+import * as vscode from "vscode";
+import * as cp from "child_process";
+import { BinaryManager } from "./binaryManager";
+import { LinterOptions } from "./types";
+import { buildLinterArgs, parseLinterOutput } from "./utils/linterUtils";
+import { findProtoFiles } from "./utils/fileUtils";
+import { getProtoPaths } from "./utils/configReader";
 
 /**
  * Manages linting of Protocol Buffer files using the api-linter binary.
@@ -19,7 +20,10 @@ export class ApiLinterProvider {
    * @param diagnosticCollection - Collection for storing diagnostics
    * @param outputChannel - Output channel for logging
    */
-  constructor(diagnosticCollection: vscode.DiagnosticCollection, outputChannel: vscode.OutputChannel) {
+  constructor(
+    diagnosticCollection: vscode.DiagnosticCollection,
+    outputChannel: vscode.OutputChannel
+  ) {
     this.diagnosticCollection = diagnosticCollection;
     this.outputChannel = outputChannel;
     this.binaryManager = new BinaryManager(outputChannel);
@@ -30,8 +34,11 @@ export class ApiLinterProvider {
    * @param document - The document to lint
    * @param saveFirst - Whether to save the document before linting (for unsaved changes)
    */
-  public async lintDocument(document: vscode.TextDocument, saveFirst: boolean = false): Promise<void> {
-    if (!document.fileName.endsWith('.proto')) {
+  public async lintDocument(
+    document: vscode.TextDocument,
+    saveFirst: boolean = false
+  ): Promise<void> {
+    if (!document.fileName.endsWith(".proto")) {
       return;
     }
 
@@ -45,37 +52,102 @@ export class ApiLinterProvider {
     try {
       const binaryPath = await this.binaryManager.ensureBinary();
       this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
-      
+
+      // Verify binary exists and is executable
+      if (!require("fs").existsSync(binaryPath)) {
+        throw new Error(`Binary not found at ${binaryPath} after download`);
+      }
+
       // Ensure googleapis and protobuf are downloaded (will skip if already present and up-to-date)
       await this.binaryManager.ensureGoogleapis();
       await this.binaryManager.ensureProtobuf();
-      
-      const options = this.getLinterOptions();
+
+      const options = await this.getLinterOptions();
       const diagnostics = await this.runLinter(binaryPath, filePath, options);
-      
-      this.outputChannel.appendLine(`Found ${diagnostics.length} diagnostic(s)`);
+
+      this.outputChannel.appendLine(
+        `Found ${diagnostics.length} diagnostic(s)`
+      );
       this.diagnosticCollection.set(document.uri, diagnostics);
     } catch (error) {
       this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
+      if (error instanceof Error) {
+        this.outputChannel.appendLine(`Error stack: ${error.stack}`);
+      }
       vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
+      // Clear diagnostics on error
+      this.diagnosticCollection.set(document.uri, []);
     }
   }
 
   /**
-   * Gets linter options from workspace configuration.
-   * @returns Linter options object
+   * Gets linter options from VS Code configuration.
+   * @returns Linter configuration options
    */
-  private getLinterOptions(): LinterOptions {
-    const config = vscode.workspace.getConfiguration('gapi');
-    return {
-      configPath: config.get<string>('configPath', ''),
-      protoPath: config.get<string[]>('protoPath', []),
-      disableRules: config.get<string[]>('disableRules', []),
-      enableRules: config.get<string[]>('enableRules', []),
-      descriptorSetIn: config.get<string[]>('descriptorSetIn', []),
-      ignoreCommentDisables: config.get<boolean>('ignoreCommentDisables', false),
-      setExitStatus: config.get<boolean>('setExitStatus', false)
+  private async getLinterOptions(): Promise<LinterOptions> {
+    const config = vscode.workspace.getConfiguration("gapi");
+
+    // Get proto paths from workspace.protobuf.yaml
+    const configProtoPaths = await getProtoPaths();
+    const userProtoPaths = config.get<string[]>("protoPath") || [];
+
+    // Merge config file paths with user settings
+    const allProtoPaths = [...configProtoPaths, ...userProtoPaths];
+
+    const options = {
+      configPath: config.get<string>("configPath"),
+      protoPath: allProtoPaths,
+      disableRules: config.get<string[]>("disableRules") || [],
+      enableRules: config.get<string[]>("enableRules") || [],
+      outputFormat: config.get<string>("outputFormat") || "json",
+      setExitStatus: config.get<boolean>("setExitStatus") || false,
     };
+
+    // Log applied settings
+    this.outputChannel.appendLine("=".repeat(60));
+    this.outputChannel.appendLine("Applied Linter Settings:");
+    this.outputChannel.appendLine(
+      `  Config Path: ${options.configPath || "(not set)"}`
+    );
+    this.outputChannel.appendLine(`  Proto Paths (${allProtoPaths.length}):`);
+    if (configProtoPaths.length > 0) {
+      this.outputChannel.appendLine(
+        `    From workspace.protobuf.yaml: ${configProtoPaths.length} path(s)`
+      );
+      configProtoPaths.forEach((p) =>
+        this.outputChannel.appendLine(`      - ${p}`)
+      );
+    }
+    if (userProtoPaths.length > 0) {
+      this.outputChannel.appendLine(
+        `    From settings.json: ${userProtoPaths.length} path(s)`
+      );
+      userProtoPaths.forEach((p) =>
+        this.outputChannel.appendLine(`      - ${p}`)
+      );
+    }
+    if (options.disableRules.length > 0) {
+      this.outputChannel.appendLine(
+        `  Disabled Rules: ${options.disableRules.join(", ")}`
+      );
+    }
+    if (options.enableRules.length > 0) {
+      this.outputChannel.appendLine(
+        `  Enabled Rules: ${options.enableRules.join(", ")}`
+      );
+    }
+    this.outputChannel.appendLine(
+      `  Set Exit Status: ${options.setExitStatus}`
+    );
+    this.outputChannel.appendLine(
+      `  Enable on Save: ${config.get<boolean>("enableOnSave")}`
+    );
+    this.outputChannel.appendLine(
+      `  Enable on Type: ${config.get<boolean>("enableOnType")}`
+    );
+    this.outputChannel.appendLine("=".repeat(60));
+
+    return options;
   }
 
   /**
@@ -83,20 +155,24 @@ export class ApiLinterProvider {
    */
   public async lintWorkspace(): Promise<void> {
     const protoFiles = await findProtoFiles();
-    
+
     if (protoFiles.length === 0) {
-      vscode.window.showInformationMessage('No .proto files found in workspace.');
+      vscode.window.showInformationMessage(
+        "No .proto files found in workspace."
+      );
       return;
     }
 
-    vscode.window.showInformationMessage(`Linting ${protoFiles.length} proto file(s)...`);
+    vscode.window.showInformationMessage(
+      `Linting ${protoFiles.length} proto file(s)...`
+    );
 
     for (const fileUri of protoFiles) {
       const document = await vscode.workspace.openTextDocument(fileUri);
       await this.lintDocument(document);
     }
 
-    vscode.window.showInformationMessage('Workspace linting completed.');
+    vscode.window.showInformationMessage("Workspace linting completed.");
   }
 
   /**
@@ -114,31 +190,35 @@ export class ApiLinterProvider {
     return new Promise((resolve, reject) => {
       const { args, workingDir } = buildLinterArgs(filePath, options);
 
-      this.outputChannel.appendLine(`Running: ${binaryPath} ${args.join(' ')}`);
+      this.outputChannel.appendLine(`Running: ${binaryPath} ${args.join(" ")}`);
       this.outputChannel.appendLine(`Working directory: ${workingDir}`);
 
       const process = cp.spawn(binaryPath, args, { cwd: workingDir });
 
-      let stdout = '';
-      let stderr = '';
+      let stdout = "";
+      let stderr = "";
 
-      process.stdout.on('data', (data) => {
+      process.stdout.on("data", (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data', (data) => {
+      process.stderr.on("data", (data) => {
         stderr += data.toString();
       });
 
-      process.on('error', (error) => {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          reject(new Error(`api-linter binary not found at: ${binaryPath}. Please install it or configure the correct path in settings.`));
+      process.on("error", (error) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          reject(
+            new Error(
+              `api-linter binary not found at: ${binaryPath}. Please install it or configure the correct path in settings.`
+            )
+          );
         } else {
           reject(error);
         }
       });
 
-      process.on('close', (code) => {
+      process.on("close", (code) => {
         if (stderr) {
           this.outputChannel.appendLine(`stderr: ${stderr}`);
         }
@@ -150,16 +230,24 @@ export class ApiLinterProvider {
           return;
         }
 
-        try {
-          const diagnostics = parseLinterOutput(stdout);
-          resolve(diagnostics);
-        } catch (error) {
-          this.outputChannel.appendLine(`Failed to parse linter output: ${error}`);
-          this.outputChannel.appendLine(`stdout: ${stdout}`);
-          resolve([]);
+        // Log raw output for debugging
+        this.outputChannel.appendLine(
+          `Raw linter output (first 500 chars): ${stdout.substring(0, 500)}`
+        );
+
+        // Always resolve with diagnostics, even if parsing fails
+        const diagnostics = parseLinterOutput(stdout, this.outputChannel);
+        if (
+          diagnostics.length === 0 &&
+          stdout.trim() !== "" &&
+          stdout.trim() !== "[]"
+        ) {
+          this.outputChannel.appendLine(
+            `Warning: No diagnostics parsed from output`
+          );
         }
+        resolve(diagnostics);
       });
     });
   }
-
 }

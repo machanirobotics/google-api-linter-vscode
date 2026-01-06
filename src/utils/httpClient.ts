@@ -24,14 +24,30 @@ export const fetchHtml = (url: string): Promise<string> => {
  */
 export const fetchJson = <T>(url: string, headers: Record<string, string> = {}): Promise<T> => {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers }, (res) => {
+    // Add User-Agent header for GitHub API
+    const requestHeaders = {
+      'User-Agent': 'vscode-google-api-linter',
+      ...headers
+    };
+    
+    https.get(url, { headers: requestHeaders }, (res) => {
       let data = '';
+      
+      // Check status code
+      if (res.statusCode !== 200) {
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          reject(new Error(`HTTP ${res.statusCode}: ${data.substring(0, 200)}`));
+        });
+        return;
+      }
+      
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         try {
           resolve(JSON.parse(data));
         } catch (error) {
-          reject(error);
+          reject(new Error(`Failed to parse JSON response. First 200 chars: ${data.substring(0, 200)}`));
         }
       });
     }).on('error', reject);

@@ -174,8 +174,6 @@ async function runLinter(
       protoPath: [],
       disableRules: [],
       enableRules: [],
-      descriptorSetIn: [],
-      ignoreCommentDisables: false,
       setExitStatus: false
     };
 

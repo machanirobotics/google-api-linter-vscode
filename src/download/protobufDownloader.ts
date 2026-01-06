@@ -95,30 +95,62 @@ export class ProtobufDownloader {
   }
 
   private async downloadProtobufZip(zipPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const url = 'https://github.com/protocolbuffers/protobuf/archive/refs/heads/main.zip';
-      const file = createWriteStream(zipPath);
-      
-      https.get(url, (response) => {
-        if (response.statusCode === 302 || response.statusCode === 301) {
-          https.get(response.headers.location!, (redirectResponse) => {
-            redirectResponse.pipe(file);
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Get latest release info from GitHub API
+        const apiUrl = 'https://api.github.com/repos/protocolbuffers/protobuf/releases/latest';
+        const releaseInfo = await this.fetchJson(apiUrl);
+        const version = releaseInfo.tag_name;
+        
+        this.outputChannel.appendLine(`Downloading protobuf ${version}...`);
+        
+        // Download the source code zip from the release
+        const url = `https://github.com/protocolbuffers/protobuf/archive/refs/tags/${version}.zip`;
+        const file = createWriteStream(zipPath);
+        
+        https.get(url, (response) => {
+          if (response.statusCode === 302 || response.statusCode === 301) {
+            https.get(response.headers.location!, (redirectResponse) => {
+              redirectResponse.pipe(file);
+              file.on('finish', () => {
+                file.close();
+                resolve();
+              });
+            }).on('error', reject);
+          } else {
+            response.pipe(file);
             file.on('finish', () => {
               file.close();
               resolve();
             });
-          }).on('error', reject);
-        } else {
-          response.pipe(file);
-          file.on('finish', () => {
-            file.close();
-            resolve();
-          });
-        }
-      }).on('error', (error) => {
-        fs.unlinkSync(zipPath);
+          }
+        }).on('error', (error) => {
+          fs.unlinkSync(zipPath);
+          reject(error);
+        });
+      } catch (error) {
         reject(error);
-      });
+      }
+    });
+  }
+
+  private async fetchJson(url: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      https.get(url, {
+        headers: {
+          'User-Agent': 'vscode-google-api-linter'
+        }
+      }, (response) => {
+        let data = '';
+        response.on('data', (chunk) => data += chunk);
+        response.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }).on('error', reject);
     });
   }
 
@@ -134,7 +166,15 @@ export class ProtobufDownloader {
         exec(`unzip -q "${zipPath}" -d "${extractPath}"`)
           .then(() => {
             try {
-              const extractedDir = path.join(extractPath, 'protobuf-main');
+              // Find the extracted directory (it will be protobuf-vX.X.X format)
+              const extractedDirs = fs.readdirSync(extractPath);
+              const protobufDir = extractedDirs.find(dir => dir.startsWith('protobuf-'));
+              
+              if (!protobufDir) {
+                throw new Error('Could not find extracted protobuf directory');
+              }
+              
+              const extractedDir = path.join(extractPath, protobufDir);
               
               if (fs.existsSync(this.PROTOBUF_DIR)) {
                 fs.rmSync(this.PROTOBUF_DIR, { recursive: true, force: true });
@@ -158,12 +198,27 @@ export class ProtobufDownloader {
   }
 
   private async updateProtobufMetadata(): Promise<void> {
-    const metadata = {
-      lastChecked: Date.now(),
-      commit: 'main',
-      source: 'https://github.com/protocolbuffers/protobuf',
-      path: this.PROTOBUF_DIR
-    };
-    await writeFile(this.PROTOBUF_METADATA_PATH, JSON.stringify(metadata, null, 2));
+    try {
+      const apiUrl = 'https://api.github.com/repos/protocolbuffers/protobuf/releases/latest';
+      const releaseInfo = await this.fetchJson(apiUrl);
+      const version = releaseInfo.tag_name;
+      
+      const metadata = {
+        lastChecked: Date.now(),
+        version: version,
+        source: 'https://github.com/protocolbuffers/protobuf',
+        path: this.PROTOBUF_DIR
+      };
+      await writeFile(this.PROTOBUF_METADATA_PATH, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      // Fallback metadata if API call fails
+      const metadata = {
+        lastChecked: Date.now(),
+        version: 'latest',
+        source: 'https://github.com/protocolbuffers/protobuf',
+        path: this.PROTOBUF_DIR
+      };
+      await writeFile(this.PROTOBUF_METADATA_PATH, JSON.stringify(metadata, null, 2));
+    }
   }
 }

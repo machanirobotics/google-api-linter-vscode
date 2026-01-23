@@ -11,3 +11,5 @@ vscode-proto3/**
 **/*.map
 **/*.ts
 !node_modules/fast-glob/**
+.actrc
+.github

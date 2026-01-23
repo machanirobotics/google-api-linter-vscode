@@ -143,6 +143,7 @@ Configure the extension through VS Code settings (File > Preferences > Settings 
 | `gapi.descriptorSetIn` | array | `[]` | FileDescriptorSet files for imports |
 | `gapi.ignoreCommentDisables` | boolean | `false` | Ignore disable comments in proto files |
 | `gapi.setExitStatus` | boolean | `false` | Return exit status 1 on lint errors |
+| `gapi.rulesDocumentationEndpoint` | string | `"https://linter.aip.dev"` | Base URL for rule documentation (use `http://localhost:8080` for local development) |
 
 ### Example Configuration
 
@@ -157,7 +158,48 @@ Configure the extension through VS Code settings (File > Preferences > Settings 
   ],
   "gapi.disableRules": [
     "core::0192::has-comments"
-  ]
+  ],
+  "gapi.rulesDocumentationEndpoint": "https://linter.aip.dev"
+}
+```
+
+### Local Development with Custom Documentation
+
+For local development or testing with a local documentation server:
+
+```json
+{
+  "gapi.rulesDocumentationEndpoint": "http://localhost:8080"
+}
+```
+
+This will redirect all rule documentation links to your local server instead of the official https://linter.aip.dev site.
+
+### Self-Hosting Documentation for Larger Teams
+
+> [!WARNING]
+> If you're using this extension with a larger team, it's **highly recommended** to host your own documentation server to avoid rate limits on the public https://linter.aip.dev site.
+
+The official api-linter documentation is available at:
+- **Documentation Source**: https://github.com/googleapis/api-linter/tree/main/docs
+- **Self-Hosting Guide**: https://github.com/googleapis/api-linter#documentation
+
+#### Why Self-Host?
+
+- **Rate Limits**: The public documentation site has rate limits that may be exceeded by teams
+- **Reliability**: Your own server ensures consistent availability
+- **Customization**: Add custom rules and documentation specific to your organization
+- **Performance**: Faster response times for your team
+
+#### Setup Example
+
+1. Clone and build the api-linter documentation
+2. Host it on your internal server (e.g., `https://docs.internal.company.com/api-linter`)
+3. Configure the extension:
+
+```json
+{
+  "gapi.rulesDocumentationEndpoint": "https://docs.internal.company.com/api-linter"
 }
 ```
 

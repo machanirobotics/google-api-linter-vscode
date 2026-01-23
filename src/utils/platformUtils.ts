@@ -22,9 +22,20 @@ export const getPlatform = (): string => {
  */
 export const getArch = (): string => {
   const arch = os.arch();
+  const platform = os.platform();
+  
   switch (arch) {
-    case 'x64': return 'amd64';
-    case 'arm64': return 'arm64';
-    default: throw new Error(`Unsupported architecture: ${arch}`);
+    case 'x64': 
+      return 'amd64';
+    case 'arm64':
+      // api-linter doesn't provide linux-arm64, fallback to amd64 (works via emulation)
+      if (platform === 'linux') {
+        return 'amd64';
+      }
+      return 'arm64';
+    case 'arm':
+      return 'arm';
+    default: 
+      throw new Error(`Unsupported architecture: ${arch}`);
   }
 };

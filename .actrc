@@ -1,0 +1,6 @@
+# act configuration
+# Use full images that include Node.js and other tools
+-P ubuntu-latest=catthehacker/ubuntu:full-latest
+-P macos-latest=catthehacker/ubuntu:full-latest
+-P windows-latest=catthehacker/ubuntu:full-latest
+--container-architecture linux/amd64

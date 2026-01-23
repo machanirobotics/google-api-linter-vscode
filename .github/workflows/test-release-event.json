@@ -1,0 +1,9 @@
+{
+  "release": {
+    "tag_name": "v1.2.1",
+    "name": "v1.2.1",
+    "prerelease": false,
+    "draft": false,
+    "upload_url": "https://uploads.github.com/repos/test/test/releases/1/assets{?name,label}"
+  }
+}

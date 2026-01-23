@@ -164,9 +164,9 @@ export const parseLinterOutput = (output: string, outputChannel?: vscode.OutputC
 };
 
 /**
- * Converts a linter problem to a VS Code diagnostic.
- * @param problem - Problem object from linter output
- * @returns VS Code Diagnostic object
+ * Creates a VS Code Diagnostic from a linter problem.
+ * @param problem - The linter problem to convert
+ * @returns A VS Code Diagnostic object
  */
 const createDiagnosticFromProblem = (problem: LinterProblem): vscode.Diagnostic => {
   const startLine = Math.max(0, problem.location.start_position.line_number - 1);
@@ -181,9 +181,15 @@ const createDiagnosticFromProblem = (problem: LinterProblem): vscode.Diagnostic 
   );
   
   diagnostic.source = 'google-api-linter';
+  
+  // Use configurable documentation endpoint
+  const config = vscode.workspace.getConfiguration('gapi');
+  const baseUrl = config.get<string>('rulesDocumentationEndpoint') || 'https://linter.aip.dev';
+  const ruleDocUri = problem.rule_doc_uri.replace('https://linter.aip.dev', baseUrl);
+  
   diagnostic.code = {
     value: problem.rule_id,
-    target: vscode.Uri.parse(problem.rule_doc_uri)
+    target: vscode.Uri.parse(ruleDocUri)
   };
 
   return diagnostic;

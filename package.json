@@ -2,7 +2,7 @@
   "name": "google-api-linter",
   "displayName": "Google API Linter",
   "description": "Google API Linter for VS Code - Production Grade API Design",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "publisher": "machanirobotics",
   "icon": "picon.png",
   "repository": {

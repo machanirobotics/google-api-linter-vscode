@@ -114,7 +114,7 @@ export class ApiLinterProvider {
       this.outputChannel.appendLine(
         `    From workspace.protobuf.yaml: ${configProtoPaths.length} path(s)`
       );
-      configProtoPaths.forEach((p) =>
+      configProtoPaths.forEach((p: string) =>
         this.outputChannel.appendLine(`      - ${p}`)
       );
     }
@@ -198,15 +198,15 @@ export class ApiLinterProvider {
       let stdout = "";
       let stderr = "";
 
-      process.stdout.on("data", (data) => {
+      process.stdout.on("data", (data: Buffer) => {
         stdout += data.toString();
       });
 
-      process.stderr.on("data", (data) => {
+      process.stderr.on("data", (data: Buffer) => {
         stderr += data.toString();
       });
 
-      process.on("error", (error) => {
+      process.on("error", (error: Error) => {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
           reject(
             new Error(
@@ -218,16 +218,9 @@ export class ApiLinterProvider {
         }
       });
 
-      process.on("close", (code) => {
+      process.on("close", (code: number) => {
         if (stderr) {
           this.outputChannel.appendLine(`stderr: ${stderr}`);
-        }
-
-        if (code !== 0 && code !== 1) {
-          this.outputChannel.appendLine(`api-linter exited with code ${code}`);
-          this.outputChannel.appendLine(`stdout: ${stdout}`);
-          reject(new Error(`api-linter exited with code ${code}`));
-          return;
         }
 
         // Log raw output for debugging
@@ -235,12 +228,32 @@ export class ApiLinterProvider {
           `Raw linter output (first 500 chars): ${stdout.substring(0, 500)}`
         );
 
-        // Always resolve with diagnostics, even if parsing fails
-        const diagnostics = parseLinterOutput(stdout, this.outputChannel);
+        // Try to parse diagnostics from stdout first (standard JSON output)
+        let diagnostics = parseLinterOutput(stdout, this.outputChannel);
+
+        // If no diagnostics found from stdout, check stderr (syntax errors often go here)
+        if (diagnostics.length === 0 && stderr.trim().length > 0) {
+          const stderrDiagnostics = parseLinterOutput(stderr, this.outputChannel);
+          if (stderrDiagnostics.length > 0) {
+            diagnostics = stderrDiagnostics;
+            this.outputChannel.appendLine(`Found ${diagnostics.length} diagnostic(s) in stderr`);
+          }
+        }
+
+        // Only reject if we failed and found no diagnostics
+        // We allow other exit codes if we successfully parsed syntax errors
+        if (diagnostics.length === 0 && code !== 0 && code !== 1) {
+          this.outputChannel.appendLine(`api-linter exited with code ${code}`);
+          this.outputChannel.appendLine(`stdout: ${stdout}`);
+          reject(new Error(`api-linter exited with code ${code}`));
+          return;
+        }
+
         if (
           diagnostics.length === 0 &&
           stdout.trim() !== "" &&
-          stdout.trim() !== "[]"
+          stdout.trim() !== "[]" &&
+          stderr.trim() === ""
         ) {
           this.outputChannel.appendLine(
             `Warning: No diagnostics parsed from output`

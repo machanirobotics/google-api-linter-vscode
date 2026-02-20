@@ -114,23 +114,19 @@ export const parseLinterOutput = (output: string, outputChannel?: vscode.OutputC
     // Find the first '[' which starts the JSON array
     const jsonStart = jsonOutput.indexOf('[');
     if (jsonStart === -1) {
-      const msg = `No JSON array found in linter output. First 200 chars: ${output.substring(0, 200)}`;
-      console.error(msg);
       if (outputChannel) {
-        outputChannel.appendLine(`ERROR: ${msg}`);
+        outputChannel.appendLine(`No JSON array found, trying generic output parser`);
       }
-      return diagnostics;
+      return parseGenericOutput(output, outputChannel);
     }
-    
+
     // Find the last ']' which ends the JSON array
     const jsonEnd = jsonOutput.lastIndexOf(']');
     if (jsonEnd === -1 || jsonEnd < jsonStart) {
-      const msg = `Invalid JSON array in linter output. First 200 chars: ${output.substring(0, 200)}`;
-      console.error(msg);
       if (outputChannel) {
-        outputChannel.appendLine(`ERROR: ${msg}`);
+        outputChannel.appendLine(`Invalid JSON array, trying generic output parser`);
       }
-      return diagnostics;
+      return parseGenericOutput(output, outputChannel);
     }
     
     // Extract only the JSON part
@@ -153,11 +149,52 @@ export const parseLinterOutput = (output: string, outputChannel?: vscode.OutputC
       });
     });
   } catch (error) {
-    const msg = `Error parsing linter output: ${error}. First 200 chars: ${output.substring(0, 200)}`;
-    console.error(msg);
+    // If JSON parsing fails, try to parse as generic text output (e.g. syntax errors)
     if (outputChannel) {
-      outputChannel.appendLine(`ERROR: ${msg}`);
+      outputChannel.appendLine(`JSON parsing failed, trying generic output parser: ${error}`);
     }
+    return parseGenericOutput(output, outputChannel);
+  }
+
+  return diagnostics;
+};
+
+/**
+ * Parses generic text output (e.g., syntax errors) from the linter.
+ * Format: file_path:line:col: message
+ */
+export const parseGenericOutput = (output: string, outputChannel?: vscode.OutputChannel): vscode.Diagnostic[] => {
+  const diagnostics: vscode.Diagnostic[] = [];
+  const lines = output.split('\n');
+  
+  // Regex for "file:line:col: message", with optional Go log timestamp prefix
+  // Example: "proto/library.proto:12:4: syntax error: unexpected identifier"
+  // Example: "2026/02/20 14:49:31 proto/library.proto:12:4: syntax error: ..."
+  const errorRegex = /^(?:\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} )?([^:]+):(\d+):(\d+):\s*(.*)$/;
+
+  for (const line of lines) {
+    const match = line.match(errorRegex);
+    if (match) {
+      const [, , lineStr, colStr, message] = match;
+      
+      const lineNum = parseInt(lineStr, 10) - 1; // 1-based to 0-based
+      const colNum = parseInt(colStr, 10) - 1;   // 1-based to 0-based
+      
+      if (lineNum >= 0 && colNum >= 0) {
+        const range = new vscode.Range(lineNum, colNum, lineNum, 200); // 200 is arbitrary end char
+        const diagnostic = new vscode.Diagnostic(
+          range,
+          message.trim(),
+          vscode.DiagnosticSeverity.Error
+        );
+        diagnostic.source = 'google-api-linter (syntax)';
+        diagnostics.push(diagnostic);
+      }
+    }
+  }
+
+  if (outputChannel && diagnostics.length > 0) {
+    outputChannel.appendLine(`Parsed ${diagnostics.length} syntax error(s) from text output`);
   }
 
   return diagnostics;

@@ -3,13 +3,26 @@
 src/**
 .gitignore
 .yarnrc
-smoke_test/protobuf/googleapis/
-smoke_test/protobuf/gen/
+bun.lock
+package-lock.json
+typedoc.json
+release_notes.md
+**/release_notes.md
+.actrc
+.cursorignore
+.github
 vscode-proto3/**
+esbuild.js
+
+# Exclude entire smoke_test (dev/e2e only)
+smoke_test/**
+
 **/tsconfig.json
 **/.eslintrc.json
-**/*.map
 **/*.ts
-!node_modules/fast-glob/**
-.actrc
-.github
+
+# Bundled extension: ship only out/extension.js, not node_modules
+node_modules/**
+
+# Source maps optional (uncomment to exclude from package)
+# **/*.map

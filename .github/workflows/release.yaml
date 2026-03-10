@@ -26,10 +26,11 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: "20"
+          cache: "npm"
 
       - name: Extract version
         id: get-version
@@ -48,18 +49,17 @@ jobs:
       - name: Update package.json version
         run: |
           VERSION="${{ steps.get-version.outputs.version }}"
-          # Use bun instead of node for better compatibility
-          bun -e "const pkg = require('./package.json'); pkg.version = '$VERSION'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          node -e "const pkg = require('./package.json'); pkg.version = '$VERSION'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');"
           echo "Updated package.json to version $VERSION"
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
       - name: Compile TypeScript
-        run: bun run compile
+        run: npm run compile
 
       - name: Package extension
-        run: bun run package
+        run: npm run package
 
       - name: Generate release notes (on tag push)
         if: github.event_name == 'push'

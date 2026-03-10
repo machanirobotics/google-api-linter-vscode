@@ -156,6 +156,9 @@ Configure the extension through VS Code settings (File > Preferences > Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `gapi.binaryPath` | string | `"api-linter"` | Path to the api-linter binary |
+| `gapi.formatOnSave` | boolean | `true` | Format proto files when you save |
+| `gapi.formatter` | string | `"buf"` | Formatter: `buf`, `clang-format`, or `simple` (built-in indent) |
+| `gapi.clangFormatPath` | string | `"clang-format"` | Path to clang-format when using `gapi.formatter: "clang-format"` |
 | `gapi.enableOnSave` | boolean | `true` | Run linter when saving proto files |
 | `gapi.enableOnType` | boolean | `false` | Run linter while typing (may impact performance) |
 | `gapi.configPath` | string | `""` | Path to `.api-linter.yaml` configuration file |
@@ -245,13 +248,17 @@ You can omit `gapi.configPath` if `.api-linter.yaml` is at the workspace root; t
 
 ### Proto View (Activity Bar)
 
-Click the **Proto** icon in the Activity Bar to open the API Linter view. You can:
+Click the **Proto** icon in the Activity Bar to open the API Linter view (Run-and-Debug style layout):
 
-- See **API Linter** status and version
-- Browse **RPCs**, **Resources**, and **MCP**-annotated items; click any item to jump to its definition
-- See all proto files with error/warning counts; **expand a file** to list each diagnostic and click to go to that line
-- **Initialize Proto Workspace** if `workspace.protobuf.yaml` is missing (or per folder in multi-root workspaces)
-- Run **Lint All**, **Lint Current File**, **Create Config File**, or **Restart**
+- **Top**: Action buttons—**Lint All Proto Files**, **Lint Current File**, **Create Config File**, **Initialize Proto Workspace**, **Restart**
+- **RPCs** (expandable): All RPC methods in services
+- **Resources** (expandable): Messages with `google.api.resource`
+- **Messages** (expandable): All proto messages
+- **MCP** (expandable): MCP options (service, tool, prompt, elicitation)
+- **Others** (expandable): Enums and other definitions (flat list)
+- **API Linter** status and workspace **proto files** with error/warning counts; expand a file to see each diagnostic
+
+**Hover** any RPC, resource, message, MCP item, or enum to see its documentation snippet (leading comment from the proto file). Click any item to jump to its definition.
 
 The extension activates when a `.proto` file is present or when `workspace.protobuf.yaml` exists in the workspace.
 
@@ -267,7 +274,7 @@ Access commands via Command Palette (Cmd+Shift+P / Ctrl+Shift+P):
 - **Google API Linter: Restart** - Restart the linter (useful after config changes)
 - **Google API Linter: Refresh Proto View** - Refresh the Proto tree view
 
-Use **Format Document** (or your configured format shortcut) in a `.proto` file to format with buf or the built-in formatter.
+**Formatting**: Proto files are formatted automatically when you save (if `gapi.formatOnSave` is true). Choose the formatter with `gapi.formatter`: **buf** ([Buf format](https://buf.build/docs/format/)), **clang-format** ([ClangFormat for Protobuf](https://clang.llvm.org/docs/ClangFormat.html)), or **simple** (built-in indent). You can also use **Format Document** (or your format shortcut) anytime.
 
 ### Automatic Linting
 

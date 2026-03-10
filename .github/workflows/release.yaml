@@ -1,6 +1,9 @@
 name: Release Extension
 
 on:
+  push:
+    tags:
+      - 'v*'   # Pushing a tag (e.g. v1.2.0) runs this workflow and creates the release
   release:
     types: [published]
   workflow_dispatch:
@@ -20,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
 
       - name: Setup Bun
@@ -28,12 +31,13 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Extract version from release tag
+      - name: Extract version
         id: get-version
         run: |
-          # Release event: use tag from release; workflow_dispatch: use input
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
           else
             VERSION="${{ github.event.inputs.version }}"
           fi
@@ -57,7 +61,62 @@ jobs:
       - name: Package extension
         run: bun run package
 
-      - name: Upload VSIX to Release
+      - name: Generate release notes (on tag push)
+        if: github.event_name == 'push'
+        id: notes
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          git fetch --tags
+          PREV_TAG=$(git tag -l 'v*' --sort=-v:refname | sed -n '2p')
+          if [ -n "${PREV_TAG}" ]; then
+            COMMIT_LOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s ([%h](https://github.com/${GH_REPO}/commit/%H))" --no-merges)
+          else
+            COMMIT_LOG=$(git log --pretty=format:"- %s ([%h](https://github.com/${GH_REPO}/commit/%H))" --no-merges HEAD)
+          fi
+          {
+            echo "## What's in this release"
+            echo ""
+            if [ -n "${COMMIT_LOG}" ]; then
+              echo "${COMMIT_LOG}"
+            else
+              echo "_No commits in this range._"
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Install"
+            echo ""
+            echo "**From VS Code Marketplace** (recommended)"
+            echo ""
+            echo "Install from the [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=machanirobotics.google-api-linter): open VS Code → Extensions (Ctrl+Shift+X / Cmd+Shift+X) → search **Google API Linter** → Install."
+            echo ""
+            echo "You can also [download the extension](https://marketplace.visualstudio.com/items?itemName=machanirobotics.google-api-linter) from the Marketplace page."
+            echo ""
+            echo "**From this release**"
+            echo ""
+            echo "Download the \`.vsix\` asset below and install from the command line:"
+            echo "\`\`\`bash"
+            echo "code --install-extension google-api-linter-${{ steps.get-version.outputs.version }}.vsix"
+            echo "\`\`\`"
+          } > release_notes.md
+          echo "Release notes generated."
+
+      - name: Create Release and upload VSIX (on tag push)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: release_notes.md
+          files: |
+            google-api-linter-${{ steps.get-version.outputs.version }}.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload VSIX to existing Release
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,15 +127,19 @@ jobs:
           asset_content_type: application/vsix
 
       - name: Publish to VS Code Marketplace
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: |
+          (github.event_name == 'release' && github.event.release.prerelease == false) ||
+          github.event_name == 'push'
         run: bun run publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Commit version bump
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json
           git commit -m "chore: bump version to ${{ steps.get-version.outputs.version }} [skip ci]"
           git push origin HEAD:main
+

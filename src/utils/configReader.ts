@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { getBufProtoPaths } from "./bufConfigReader";
 
 /**
  * Configuration from workspace.protobuf.yaml
@@ -79,19 +80,41 @@ export async function readGapiConfig(
 }
 
 /**
- * Gets proto paths from workspace.protobuf.yaml or falls back to workspace root
+ * Gets proto paths from workspace.protobuf.yaml, buf.yaml (modules + deps), or falls back to workspace root.
+ * When buf.yaml exists, runs buf mod download and buf export so deps (e.g. googleapis, grpc-mcp-gateway) are included for linting.
  */
-export async function getProtoPaths(): Promise<string[]> {
-  const configUri = await findGapiConfigFile();
+export async function getProtoPaths(
+  outputChannel?: { appendLine: (s: string) => void }
+): Promise<string[]> {
+  const allPaths: string[] = [];
+  const seen = new Set<string>();
 
+  const configUri = await findGapiConfigFile();
   if (configUri) {
     const config = await readGapiConfig(configUri);
     if (config) {
-      return config.protoPaths;
+      for (const p of config.protoPaths) {
+        if (!seen.has(p)) {
+          seen.add(p);
+          allPaths.push(p);
+        }
+      }
     }
   }
 
-  // Fallback to workspace root
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  return workspaceRoot ? [workspaceRoot] : [];
+  const bufPaths = await getBufProtoPaths(outputChannel);
+  for (const p of bufPaths) {
+    const normalized = path.resolve(p);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      allPaths.push(normalized);
+    }
+  }
+
+  if (allPaths.length === 0) {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot) allPaths.push(workspaceRoot);
+  }
+
+  return allPaths;
 }

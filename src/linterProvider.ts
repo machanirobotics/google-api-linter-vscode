@@ -87,8 +87,8 @@ export class ApiLinterProvider {
   private async getLinterOptions(): Promise<LinterOptions> {
     const config = vscode.workspace.getConfiguration("gapi");
 
-    // Get proto paths from workspace.protobuf.yaml
-    const configProtoPaths = await getProtoPaths();
+    // Get proto paths from workspace.protobuf.yaml and buf.yaml (modules + deps)
+    const configProtoPaths = await getProtoPaths(this.outputChannel);
     const userProtoPaths = config.get<string[]>("protoPath") || [];
 
     // Merge config file paths with user settings
@@ -112,7 +112,7 @@ export class ApiLinterProvider {
     this.outputChannel.appendLine(`  Proto Paths (${allProtoPaths.length}):`);
     if (configProtoPaths.length > 0) {
       this.outputChannel.appendLine(
-        `    From workspace.protobuf.yaml: ${configProtoPaths.length} path(s)`
+        `    From workspace.protobuf.yaml and/or buf.yaml (modules + deps): ${configProtoPaths.length} path(s)`
       );
       configProtoPaths.forEach((p: string) =>
         this.outputChannel.appendLine(`      - ${p}`)

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LinterOptions, LinterOutput, LinterProblem } from '../types';
+import { CONFIG_FILE_NAME } from '../constants';
 
 /**
  * Resolves workspace variables in a path string.
@@ -25,6 +26,46 @@ const resolveWorkspaceVariables = (pathStr: string, filePath: string): string =>
 };
 
 /**
+ * Find .api-linter.yaml in workspace root or walking up from the file's directory.
+ * So linting works from inside any folder and the config is still used.
+ */
+function findApiLinterConfig(filePath: string): string | null {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  const workspaceRoot = workspaceFolders?.length
+    ? (vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath))?.uri.fsPath ?? workspaceFolders[0].uri.fsPath)
+    : path.dirname(filePath);
+  const rootAt = path.resolve(workspaceRoot);
+  let dir = path.resolve(path.dirname(filePath));
+  while (dir && (dir === rootAt || dir.startsWith(rootAt + path.sep))) {
+    const candidate = path.join(dir, CONFIG_FILE_NAME);
+    if (fs.existsSync(candidate)) return candidate;
+    if (dir === rootAt) break;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  const atRoot = path.join(rootAt, CONFIG_FILE_NAME);
+  return fs.existsSync(atRoot) ? atRoot : null;
+}
+
+/**
+ * If the file is under a directory named "protobuf", return that directory so
+ * imports like "store/info/v1/category.proto" resolve (root = protobuf).
+ */
+function getProtobufRootProtoPath(filePath: string): string | null {
+  const absolute = path.resolve(filePath);
+  const parts = absolute.split(path.sep);
+  for (let i = parts.length - 2; i >= 0; i--) {
+    if (parts[i] === 'protobuf') {
+      const protoRoot = parts.slice(0, i + 1).join(path.sep);
+      if (fs.existsSync(protoRoot)) return protoRoot;
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Builds command-line arguments for the api-linter binary.
  * @param filePath - Path to the proto file to lint
  * @param options - Linter configuration options
@@ -36,11 +77,11 @@ export const buildLinterArgs = (
 ): { args: string[]; workingDir: string; fileName: string } => {
   const args: string[] = [];
 
-  if (options.configPath) {
-    const resolvedConfigPath = resolveWorkspaceVariables(options.configPath, filePath);
-    if (fs.existsSync(resolvedConfigPath)) {
-      args.push('--config', resolvedConfigPath);
-    }
+  const configToUse = options.configPath
+    ? resolveWorkspaceVariables(options.configPath, filePath)
+    : findApiLinterConfig(filePath);
+  if (configToUse && fs.existsSync(configToUse)) {
+    args.push('--config', configToUse);
   }
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
@@ -62,6 +103,11 @@ export const buildLinterArgs = (
     if (fs.existsSync(workspaceGapiDir)) {
       args.push('--proto-path', workspaceGapiDir);
     }
+  }
+  
+  const protobufRoot = getProtobufRootProtoPath(filePath);
+  if (protobufRoot) {
+    args.push('--proto-path', protobufRoot);
   }
   
   const homeGapiDir = path.join(require('os').homedir(), '.gapi', 'googleapis');

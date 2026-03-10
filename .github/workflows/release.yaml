@@ -84,8 +84,6 @@ jobs:
               echo "_No commits in this range._"
             fi
             echo ""
-            echo "---"
-            echo ""
             echo "## Install"
             echo ""
             echo "**From VS Code Marketplace** (recommended)"
@@ -108,7 +106,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body_path: release_notes.md
           files: |
             google-api-linter-${{ steps.get-version.outputs.version }}.vsix

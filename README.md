@@ -27,7 +27,10 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 ### Workspace & setup
 - **Automatic Binary Management**: Downloads and updates api-linter binary automatically
 - **Automatic googleapis Integration**: Downloads googleapis protos on first use - no configuration needed
-- **Smart Proto Path Detection**: Uses `workspace.protobuf.yaml` and settings for proto paths
+- **Smart Proto Path Detection**: Uses `workspace.protobuf.yaml`, **buf.yaml** (modules + deps), and settings for proto paths
+- **buf.yaml support**: When `buf.yaml` is present, the extension runs `buf mod download` and `buf export` so linting resolves all **deps** (e.g. `buf.build/googleapis/googleapis`, `buf.build/machanirobotics/grpc-mcp-gateway`) and local **modules**; no manual proto paths needed for Buf dependencies
+- **Protobuf folder as root**: If your protos live under a folder named `protobuf/`, that directory is used as the import root so `import "store/info/v1/category.proto"` resolves to `protobuf/store/info/v1/category.proto`; linting works from any subfolder
+- **.api-linter.yaml auto-discovery**: If you don’t set `gapi.configPath`, the extension finds `.api-linter.yaml` by walking up from the current file to the workspace root, so the config is used even when editing files in subfolders
 - **Workspace Linting**: Lint all proto files in your workspace with a single command
 - **Initialize Proto Workspace**: Create `workspace.protobuf.yaml` from the Proto view; in multi-root workspaces, init is available per folder
 - **Multi-Root Workspaces**: Proto view and init are scoped per workspace folder when multiple roots are open
@@ -230,11 +233,13 @@ For project-specific settings, create `.vscode/settings.json`:
 {
   "gapi.configPath": "${workspaceFolder}/.api-linter.yaml",
   "gapi.protoPath": [
-    "${workspaceFolder}/proto",
+    "${workspaceFolder}/protobuf",
     "${workspaceFolder}/third_party"
   ]
 }
 ```
+
+You can omit `gapi.configPath` if `.api-linter.yaml` is at the workspace root; the extension will discover it automatically when linting from any folder.
 
 ## Usage
 
@@ -315,6 +320,39 @@ proto_path: .
 
 In **multi-root workspaces**, each folder can have its own `workspace.protobuf.yaml`; the Proto view shows one section per folder and offers init per folder when the config is missing.
 
+### buf.yaml (Buf build)
+
+If your project uses [Buf](https://buf.build/) with a `buf.yaml` at the workspace root (or next to your protos), the extension will:
+
+- Read **modules** (e.g. `path: protobuf`, `name: buf.build/machanirobotics/protoverse`) and **deps** (e.g. `buf.build/googleapis/googleapis`, `buf.build/machanirobotics/grpc-mcp-gateway`)
+- Run `buf mod download` and `buf export` so the api-linter can resolve all imports when linting
+- Use the exported tree and local module paths as proto paths (cached for 5 minutes)
+
+Ensure `buf` is on your PATH. If `buf` is not installed or export fails, the extension falls back to other proto paths (`workspace.protobuf.yaml`, `gapi.protoPath`, and the `protobuf` folder root).
+
+### Proto layout with a `protobuf` folder
+
+A common layout is to put all protos under a single root folder (e.g. `protobuf/`) so imports are consistent:
+
+```
+your-repo/
+├── .api-linter.yaml
+├── workspace.protobuf.yaml    # proto_path: protobuf
+├── buf.yaml                    # optional; deps + modules
+└── protobuf/
+    ├── store/
+    │   └── info/
+    │       └── v1/
+    │           └── category.proto
+    └── info/
+        └── v1/
+            └── ...
+```
+
+- In `workspace.protobuf.yaml` set `proto_path: protobuf` (or `proto_path: .` if the config file is inside `protobuf/`).
+- Then `import "store/info/v1/category.proto"` resolves to `protobuf/store/info/v1/category.proto`.
+- The extension automatically adds the `protobuf` directory as a proto path when the file you’re editing is under a folder named `protobuf`, so linting works from any subfolder and `.api-linter.yaml` at the repo root is still found.
+
 ## Troubleshooting
 
 ### Binary Not Found
@@ -374,8 +412,14 @@ code --install-extension google-api-linter-1.0.0.vsix
 
 ### Publishing to the Marketplace
 
-Creating a **GitHub Release** (e.g. tag `v1.2.0`) runs the [Release workflow](.github/workflows/release.yaml): it builds the extension, uploads the `.vsix` to the release, and **publishes to the VS Code Marketplace** (for non-prerelease releases).  
-Add the `VSCE_PAT` secret to the repo as described in [.github/SECRETS.md](.github/SECRETS.md).
+Push a tag to create a release and publish automatically:
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The [Release workflow](.github/workflows/release.yaml) builds the extension, creates the GitHub release with commit-based release notes and the `.vsix` asset, and **publishes to the VS Code Marketplace** (if the `VSCE_PAT` secret is set). Add `VSCE_PAT` as described in [.github/SECRETS.md](.github/SECRETS.md).
 
 ### Project Structure
 
@@ -405,7 +449,7 @@ vscode-googleapi-linter/
 │   ├── foldingProvider.ts
 │   ├── symbolHoverProvider.ts
 │   ├── protoScanner.ts        # Scan workspace for RPCs, resources, MCP
-│   └── utils/                 # fileUtils, configReader, protoParser, linterUtils, etc.
+│   └── utils/                 # fileUtils, configReader, bufConfigReader, protoParser, linterUtils, etc.
 ├── snippets/
 │   └── proto3.json            # Proto3, MCP, and resource+service (CRUD) snippets
 ├── package.json               # Extension manifest

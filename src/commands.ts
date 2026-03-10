@@ -9,8 +9,9 @@ import {
 	CONFIG_TEMPLATE,
 	WORKSPACE_PROTOBUF_YAML,
 } from "./constants";
+import { getFormatEdits } from "./formatProvider";
 import type { ApiLinterProvider } from "./linterProvider";
-import { getActiveProtoEditor } from "./utils/fileUtils";
+import { findProtoFiles, getActiveProtoEditor } from "./utils/fileUtils";
 
 const exec = promisify(cp.exec);
 
@@ -53,6 +54,61 @@ export const createLintWorkspaceCommand = (
 		"googleApiLinter.lintWorkspace",
 		async () => {
 			await linterProvider.lintWorkspace();
+		},
+	);
+};
+
+/**
+ * Creates the command to format all proto files in the workspace.
+ * @returns Disposable command registration
+ */
+export const createFormatAllProtosCommand = () => {
+	return vscode.commands.registerCommand(
+		"googleApiLinter.formatAllProtos",
+		async () => {
+			const protoUris = await findProtoFiles();
+			if (protoUris.length === 0) {
+				vscode.window.showInformationMessage(
+					"No .proto files found in workspace.",
+				);
+				return;
+			}
+			let formatted = 0;
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: "Formatting proto files",
+					cancellable: false,
+				},
+				async () => {
+					for (const uri of protoUris) {
+						const doc = await vscode.workspace.openTextDocument(uri);
+						const editorConfig = vscode.workspace.getConfiguration(
+							"editor",
+							doc.uri,
+						);
+						const options: vscode.FormattingOptions = {
+							tabSize: editorConfig.get<number>("tabSize", 2),
+							insertSpaces: editorConfig.get<boolean>(
+								"insertSpaces",
+								true,
+							),
+						};
+						const edits = await getFormatEdits(doc, options);
+						if (edits.length > 0) {
+							const edit = new vscode.WorkspaceEdit();
+							for (const te of edits) {
+								edit.replace(doc.uri, te.range, te.newText);
+							}
+							await vscode.workspace.applyEdit(edit);
+							formatted++;
+						}
+					}
+				},
+			);
+			vscode.window.showInformationMessage(
+				`Formatted ${formatted} of ${protoUris.length} proto file(s).`,
+			);
 		},
 	);
 };

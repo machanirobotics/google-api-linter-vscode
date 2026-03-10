@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { DIAGNOSTIC_SOURCE } from "./constants";
-import { type LocationItem, scanWorkspaceProto } from "./protoScanner";
+import {
+	type LocationItem,
+	type RpcItem,
+	type ServiceItem,
+	scanWorkspaceProto,
+} from "./protoScanner";
 import {
 	findGapiConfigFile,
 	findGapiConfigFileInFolder,
@@ -39,10 +44,26 @@ export type ProtoTreeNode =
 	  }
 	| {
 			kind: "section";
-			id: "rpcs" | "resources" | "messages" | "mcp" | "others";
+			id:
+				| "services"
+				| "resources"
+				| "mcp"
+				| "files"
+				| "rpcs"
+				| "messages"
+				| "others";
 			label: string;
 			count: number;
 			icon: string;
+	  }
+	| { kind: "service"; service: ServiceItem }
+	| { kind: "rpc"; rpc: RpcItem; serviceName: string }
+	| { kind: "rpcDetail"; type: "request" | "response"; typeName: string }
+	| {
+			kind: "mcpSubsection";
+			id: "tools" | "elicitation" | "prompts";
+			label: string;
+			count: number;
 	  }
 	| { kind: "location"; item: LocationItem }
 	| { kind: "folder"; name: string; uri: vscode.Uri }
@@ -56,10 +77,14 @@ export class ProtoTreeDataProvider
 	>();
 	readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 	private scanCache: {
+		services: ServiceItem[];
 		rpcs: LocationItem[];
 		resources: LocationItem[];
 		messages: LocationItem[];
 		mcp: LocationItem[];
+		mcpTools: LocationItem[];
+		mcpElicitation: LocationItem[];
+		mcpPrompts: LocationItem[];
 		others: LocationItem[];
 	} | null = null;
 
@@ -75,17 +100,31 @@ export class ProtoTreeDataProvider
 	}
 
 	private async getScan(): Promise<{
+		services: ServiceItem[];
 		rpcs: LocationItem[];
 		resources: LocationItem[];
 		messages: LocationItem[];
 		mcp: LocationItem[];
+		mcpTools: LocationItem[];
+		mcpElicitation: LocationItem[];
+		mcpPrompts: LocationItem[];
 		others: LocationItem[];
 	}> {
 		if (this.scanCache) return this.scanCache;
 		const root = vscode.workspace.workspaceFolders?.[0]?.uri;
 		this.scanCache = root
 			? await scanWorkspaceProto(root)
-			: { rpcs: [], resources: [], messages: [], mcp: [], others: [] };
+			: {
+					services: [],
+					rpcs: [],
+					resources: [],
+					messages: [],
+					mcp: [],
+					mcpTools: [],
+					mcpElicitation: [],
+					mcpPrompts: [],
+					others: [],
+				};
 		return this.scanCache;
 	}
 
@@ -130,9 +169,23 @@ export class ProtoTreeDataProvider
 			item.description = hasDiag
 				? `${errorCount} error(s), ${warningCount} warning(s)`
 				: "OK";
-			item.iconPath = new vscode.ThemeIcon(
-				errorCount > 0 ? "error" : warningCount > 0 ? "warning" : "symbol-file",
-			);
+			// Debugger-style colors: green = OK, orange = warning, red = error
+			if (errorCount > 0) {
+				item.iconPath = new vscode.ThemeIcon(
+					"circle-filled",
+					new vscode.ThemeColor("testing.iconFailed"),
+				);
+			} else if (warningCount > 0) {
+				item.iconPath = new vscode.ThemeIcon(
+					"circle-filled",
+					new vscode.ThemeColor("editorWarning.foreground"),
+				);
+			} else {
+				item.iconPath = new vscode.ThemeIcon(
+					"circle-filled",
+					new vscode.ThemeColor("testing.iconPassed"),
+				);
+			}
 			item.command = {
 				command: "vscode.open",
 				title: "Open",
@@ -174,13 +227,65 @@ export class ProtoTreeDataProvider
 			item.description = `${element.count}`;
 			item.iconPath = new vscode.ThemeIcon(element.icon);
 			const sectionDescriptions: Record<string, string> = {
-				rpcs: "RPC methods in services",
+				services: "Services with RPCs (expand to see Request/Response)",
 				resources: "Messages with google.api.resource",
+				mcp: "MCP: Tools, Elicitation, Prompts (by RPC)",
+				files: "Proto files (green=OK, orange=warning, red=error)",
+				rpcs: "RPC methods in services",
 				messages: "Proto messages",
-				mcp: "MCP options (service, tool, prompt, elicitation)",
 				others: "Enums and other definitions",
 			};
 			item.tooltip = sectionDescriptions[element.id] ?? element.label;
+			return item;
+		}
+		if (element.kind === "service") {
+			const item = new vscode.TreeItem(
+				element.service.name,
+				vscode.TreeItemCollapsibleState.Collapsed,
+			);
+			item.description = `${element.service.rpcs.length} RPC(s)`;
+			item.iconPath = new vscode.ThemeIcon("symbol-interface");
+			item.command = {
+				command: "googleApiLinter.revealLocation",
+				title: "Go to",
+				arguments: [element.service.uri, element.service.range],
+			};
+			return item;
+		}
+		if (element.kind === "rpc") {
+			const item = new vscode.TreeItem(
+				element.rpc.name,
+				vscode.TreeItemCollapsibleState.Collapsed,
+			);
+			item.description = element.rpc.detail;
+			item.iconPath = new vscode.ThemeIcon("symbol-method");
+			item.command = {
+				command: "googleApiLinter.revealLocation",
+				title: "Go to",
+				arguments: [element.rpc.uri, element.rpc.range],
+			};
+			if (element.rpc.documentation) {
+				item.tooltip = new vscode.MarkdownString(element.rpc.documentation);
+			}
+			return item;
+		}
+		if (element.kind === "rpcDetail") {
+			const item = new vscode.TreeItem(
+				element.type === "request" ? `Request: ${element.typeName}` : `Response: ${element.typeName}`,
+				vscode.TreeItemCollapsibleState.None,
+			);
+			item.iconPath = new vscode.ThemeIcon("symbol-parameter");
+			return item;
+		}
+		if (element.kind === "mcpSubsection") {
+			const item = new vscode.TreeItem(
+				element.label,
+				vscode.TreeItemCollapsibleState.Expanded,
+			);
+			item.description = `${element.count}`;
+			item.iconPath = new vscode.ThemeIcon(
+				element.id === "tools" ? "tools" : element.id === "elicitation" ? "question" : "comment-discussion",
+			);
 			return item;
 		}
 		if (element.kind === "location") {
@@ -219,22 +324,114 @@ export class ProtoTreeDataProvider
 
 		if (element?.kind === "section") {
 			const scan = await this.getScan();
-			if (element.id === "rpcs")
-				return scan.rpcs.map((item) => ({ kind: "location" as const, item }));
+			if (element.id === "services")
+				return scan.services.map((service) => ({
+					kind: "service" as const,
+					service,
+				}));
 			if (element.id === "resources")
 				return scan.resources.map((item) => ({
 					kind: "location" as const,
 					item,
 				}));
+			if (element.id === "mcp") {
+				const nodes: ProtoTreeNode[] = [];
+				if (scan.mcpTools.length > 0)
+					nodes.push({
+						kind: "mcpSubsection",
+						id: "tools",
+						label: "Tools",
+						count: scan.mcpTools.length,
+					});
+				if (scan.mcpElicitation.length > 0)
+					nodes.push({
+						kind: "mcpSubsection",
+						id: "elicitation",
+						label: "Elicitation",
+						count: scan.mcpElicitation.length,
+					});
+				if (scan.mcpPrompts.length > 0)
+					nodes.push({
+						kind: "mcpSubsection",
+						id: "prompts",
+						label: "Prompts",
+						count: scan.mcpPrompts.length,
+					});
+				return nodes;
+			}
+			if (element.id === "files") {
+				const protoUris = await findProtoFiles();
+				const fileNodes: ProtoTreeNode[] = [];
+				for (const uri of protoUris) {
+					const diagnostics = this.diagnosticCollection.get(uri) ?? [];
+					const fromUs = diagnostics.filter(
+						(d) => d.source === DIAGNOSTIC_SOURCE,
+					);
+					const errorCount = fromUs.filter(
+						(d) => d.severity === vscode.DiagnosticSeverity.Error,
+					).length;
+					const warningCount = fromUs.filter(
+						(d) => d.severity === vscode.DiagnosticSeverity.Warning,
+					).length;
+					fileNodes.push({ kind: "file", uri, errorCount, warningCount });
+				}
+				fileNodes.sort((a, b) => {
+					if (a.kind !== "file" || b.kind !== "file") return 0;
+					return vscode.workspace
+						.asRelativePath(a.uri)
+						.localeCompare(vscode.workspace.asRelativePath(b.uri));
+				});
+				return fileNodes;
+			}
+			if (element.id === "rpcs")
+				return scan.rpcs.map((item) => ({ kind: "location" as const, item }));
 			if (element.id === "messages")
 				return scan.messages.map((item) => ({
 					kind: "location" as const,
 					item,
 				}));
-			if (element.id === "mcp")
-				return scan.mcp.map((item) => ({ kind: "location" as const, item }));
 			if (element.id === "others")
 				return scan.others.map((item) => ({ kind: "location" as const, item }));
+			return [];
+		}
+
+		if (element?.kind === "service") {
+			return element.service.rpcs.map((rpc) => ({
+				kind: "rpc" as const,
+				rpc,
+				serviceName: element.service.name,
+			}));
+		}
+
+		if (element?.kind === "rpc") {
+			return [
+				{
+					kind: "rpcDetail" as const,
+					type: "request" as const,
+					typeName: element.rpc.requestType,
+				},
+				{
+					kind: "rpcDetail" as const,
+					type: "response" as const,
+					typeName: element.rpc.responseType,
+				},
+			];
+		}
+
+		if (element?.kind === "mcpSubsection") {
+			const scan = await this.getScan();
+			if (element.id === "tools")
+				return scan.mcpTools.map((item) => ({ kind: "location" as const, item }));
+			if (element.id === "elicitation")
+				return scan.mcpElicitation.map((item) => ({
+					kind: "location" as const,
+					item,
+				}));
+			if (element.id === "prompts")
+				return scan.mcpPrompts.map((item) => ({
+					kind: "location" as const,
+					item,
+				}));
 			return [];
 		}
 
@@ -307,49 +504,37 @@ export class ProtoTreeDataProvider
 				icon: "folder-opened",
 			});
 		} else {
-			// Top: action buttons (Run and Debug style)
+			// Top-level button bar (debugger style): Lint, Format, Reload
 			roots.push(
 				{
 					kind: "action",
 					command: "googleApiLinter.lintWorkspace",
-					label: "Lint All Proto Files",
+					label: "Lint",
 					icon: "play",
 				},
 				{
 					kind: "action",
-					command: "googleApiLinter.lintCurrentFile",
-					label: "Lint Current File",
-					icon: "go-to-file",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.createConfig",
-					label: "Create Config File",
-					icon: "settings-gear",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.initWorkspace",
-					label: "Initialize Proto Workspace",
-					icon: "folder-opened",
+					command: "googleApiLinter.formatAllProtos",
+					label: "Format",
+					icon: "prettier",
 				},
 				{
 					kind: "action",
 					command: "googleApiLinter.restart",
-					label: "Restart",
+					label: "Reload",
 					icon: "debug-restart",
 				},
 			);
 
 			const scan = await this.getScan();
 
-			if (scan.rpcs.length > 0) {
+			if (scan.services.length > 0) {
 				roots.push({
 					kind: "section",
-					id: "rpcs",
-					label: "RPCs",
-					count: scan.rpcs.length,
-					icon: "symbol-method",
+					id: "services",
+					label: "Services",
+					count: scan.services.length,
+					icon: "symbol-interface",
 				});
 			}
 			if (scan.resources.length > 0) {
@@ -358,15 +543,6 @@ export class ProtoTreeDataProvider
 					id: "resources",
 					label: "Resources",
 					count: scan.resources.length,
-					icon: "symbol-class",
-				});
-			}
-			if (scan.messages.length > 0) {
-				roots.push({
-					kind: "section",
-					id: "messages",
-					label: "Messages",
-					count: scan.messages.length,
 					icon: "symbol-class",
 				});
 			}
@@ -379,15 +555,14 @@ export class ProtoTreeDataProvider
 					icon: "symbol-interface",
 				});
 			}
-			if (scan.others.length > 0) {
-				roots.push({
-					kind: "section",
-					id: "others",
-					label: "Others",
-					count: scan.others.length,
-					icon: "symbol-enum",
-				});
-			}
+			const protoUrisForFiles = await findProtoFiles();
+			roots.push({
+				kind: "section",
+				id: "files",
+				label: "Files",
+				count: protoUrisForFiles.length,
+				icon: "symbol-file",
+			});
 
 			try {
 				const version = await this.getBinaryVersion();
@@ -409,73 +584,6 @@ export class ProtoTreeDataProvider
 				});
 			}
 		}
-
-		const folders = vscode.workspace.workspaceFolders ?? [];
-		const multiRoot = folders.length > 1;
-
-		if (multiRoot) {
-			for (const folder of folders) {
-				roots.push({ kind: "folder", name: folder.name, uri: folder.uri });
-			}
-		} else {
-			const protoUris = await findProtoFiles();
-			const fileNodes: ProtoTreeNode[] = [];
-			for (const uri of protoUris) {
-				const diagnostics = this.diagnosticCollection.get(uri) ?? [];
-				const fromUs = diagnostics.filter(
-					(d) => d.source === DIAGNOSTIC_SOURCE,
-				);
-				const errorCount = fromUs.filter(
-					(d) => d.severity === vscode.DiagnosticSeverity.Error,
-				).length;
-				const warningCount = fromUs.filter(
-					(d) => d.severity === vscode.DiagnosticSeverity.Warning,
-				).length;
-				fileNodes.push({ kind: "file", uri, errorCount, warningCount });
-			}
-			fileNodes.sort((a, b) => {
-				if (a.kind !== "file" || b.kind !== "file") return 0;
-				return vscode.workspace
-					.asRelativePath(a.uri)
-					.localeCompare(vscode.workspace.asRelativePath(b.uri));
-			});
-			roots.push(...fileNodes);
-		}
-
-		// Avoid duplicating actions when we already added them above
-		if (!hasWorkspaceConfig)
-			roots.push(
-				{
-					kind: "action",
-					command: "googleApiLinter.lintWorkspace",
-					label: "Lint All Proto Files",
-					icon: "play",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.lintCurrentFile",
-					label: "Lint Current File",
-					icon: "go-to-file",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.createConfig",
-					label: "Create Config File",
-					icon: "settings-gear",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.initWorkspace",
-					label: "Initialize Proto Workspace",
-					icon: "folder-opened",
-				},
-				{
-					kind: "action",
-					command: "googleApiLinter.restart",
-					label: "Restart",
-					icon: "debug-restart",
-				},
-			);
 
 		return roots;
 	}

@@ -10,13 +10,39 @@ export interface LocationItem {
 	uri: vscode.Uri;
 	range: vscode.Range;
 	icon: string;
+	/** For MCP: which RPC this option is attached to (same service block). */
+	rpcName?: string;
+	/** For MCP: tool | prompt | elicitation | service */
+	mcpKind?: "tool" | "prompt" | "elicitation" | "service";
+}
+
+export interface RpcItem {
+	name: string;
+	fullName: string;
+	requestType: string;
+	responseType: string;
+	detail: string;
+	documentation?: string;
+	uri: vscode.Uri;
+	range: vscode.Range;
+}
+
+export interface ServiceItem {
+	name: string;
+	uri: vscode.Uri;
+	range: vscode.Range;
+	rpcs: RpcItem[];
 }
 
 export interface WorkspaceProtoScan {
+	services: ServiceItem[];
 	rpcs: LocationItem[];
 	resources: LocationItem[];
 	messages: LocationItem[];
 	mcp: LocationItem[];
+	mcpTools: LocationItem[];
+	mcpElicitation: LocationItem[];
+	mcpPrompts: LocationItem[];
 	others: LocationItem[];
 }
 
@@ -28,6 +54,7 @@ const RE_OPTION_MCP_TOOL = /option\s*\(\s*mcp\.protobuf\.tool\s*\)/;
 const RE_OPTION_MCP_PROMPT = /option\s*\(\s*mcp\.protobuf\.prompt\s*\)/;
 const RE_OPTION_MCP_ELICITATION =
 	/option\s*\(\s*mcp\.protobuf\.elicitation\s*\)/;
+const RE_RPC_DETAIL = /^\(([^)]+)\)\s*returns\s*\(([^)]+)\)$/;
 
 function getLeadingComment(
 	lines: string[],
@@ -64,10 +91,14 @@ function getLeadingComment(
 export async function scanWorkspaceProto(
 	_workspaceRoot: vscode.Uri,
 ): Promise<WorkspaceProtoScan> {
+	const services: ServiceItem[] = [];
 	const rpcs: LocationItem[] = [];
 	const resources: LocationItem[] = [];
 	const messages: LocationItem[] = [];
 	const mcp: LocationItem[] = [];
+	const mcpTools: LocationItem[] = [];
+	const mcpElicitation: LocationItem[] = [];
+	const mcpPrompts: LocationItem[] = [];
 	const others: LocationItem[] = [];
 	const resourceNames = new Set<string>();
 
@@ -81,11 +112,27 @@ export async function scanWorkspaceProto(
 			const symbols = parseProtoDocument(doc);
 			const flat = flattenSymbols(symbols);
 
+			// Build services with RPCs (request/response)
 			for (const s of symbols) {
 				if (s.kind === "service") {
+					const rpcItems: RpcItem[] = [];
 					for (const c of s.children ?? []) {
 						if (c.kind === "rpc") {
 							const lineIndex = c.selectionRange.start.line;
+							const detail = c.detail ?? "";
+							const match = detail.match(RE_RPC_DETAIL);
+							const requestType = match ? match[1].trim() : "";
+							const responseType = match ? match[2].trim() : "";
+							rpcItems.push({
+								name: c.name,
+								fullName: `${s.name}.${c.name}`,
+								requestType,
+								responseType,
+								detail,
+								documentation: getLeadingComment(lines, lineIndex),
+								uri,
+								range: c.selectionRange,
+							});
 							rpcs.push({
 								label: `${s.name}.${c.name}`,
 								detail: c.detail,
@@ -95,6 +142,14 @@ export async function scanWorkspaceProto(
 								icon: "symbol-method",
 							});
 						}
+					}
+					if (rpcItems.length > 0) {
+						services.push({
+							name: s.name,
+							uri,
+							range: s.selectionRange,
+							rpcs: rpcItems,
+						});
 					}
 				}
 			}
@@ -140,6 +195,31 @@ export async function scanWorkspaceProto(
 				}
 			}
 
+			// RPC line numbers in this file (for MCP→RPC association)
+			const rpcLines: { line: number; rpcName: string }[] = [];
+			for (const s of symbols) {
+				if (s.kind === "service") {
+					for (const c of s.children ?? []) {
+						if (c.kind === "rpc") {
+							rpcLines.push({
+								line: c.range.start.line,
+								rpcName: `${s.name}.${c.name}`,
+							});
+						}
+					}
+				}
+			}
+			rpcLines.sort((a, b) => a.line - b.line);
+
+			const getLastRpcBefore = (line: number): string | undefined => {
+				let last: string | undefined;
+				for (const { line: L, rpcName } of rpcLines) {
+					if (L < line) last = rpcName;
+					else break;
+				}
+				return last;
+			};
+
 			for (let i = 0; i < lines.length; i++) {
 				const line = lines[i];
 				if (RE_COMMENT.test(line.trim())) continue;
@@ -151,44 +231,61 @@ export async function scanWorkspaceProto(
 							.slice(Math.max(0, i - 5), i)
 							.join("\n")
 							.match(/\bservice\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\{?/);
-					mcp.push({
+					const item: LocationItem = {
 						label: serviceMatch ? `service ${serviceMatch[1]}` : "MCP service",
 						detail: "mcp.protobuf.service",
 						documentation: getLeadingComment(lines, i),
 						uri,
 						range: new vscode.Range(i, 0, i, line.length),
 						icon: "symbol-interface",
-					});
+						mcpKind: "service",
+					};
+					mcp.push(item);
 				}
 				if (RE_OPTION_MCP_TOOL.test(line)) {
-					mcp.push({
-						label: "tool option",
+					const rpcName = getLastRpcBefore(i);
+					const item: LocationItem = {
+						label: rpcName ? `tool · ${rpcName}` : "tool option",
 						detail: "mcp.protobuf.tool",
 						documentation: getLeadingComment(lines, i),
 						uri,
 						range: new vscode.Range(i, 0, i, line.length),
 						icon: "tools",
-					});
+						rpcName,
+						mcpKind: "tool",
+					};
+					mcp.push(item);
+					mcpTools.push(item);
 				}
 				if (RE_OPTION_MCP_PROMPT.test(line)) {
-					mcp.push({
-						label: "prompt option",
+					const rpcName = getLastRpcBefore(i);
+					const item: LocationItem = {
+						label: rpcName ? `prompt · ${rpcName}` : "prompt option",
 						detail: "mcp.protobuf.prompt",
 						documentation: getLeadingComment(lines, i),
 						uri,
 						range: new vscode.Range(i, 0, i, line.length),
 						icon: "comment-discussion",
-					});
+						rpcName,
+						mcpKind: "prompt",
+					};
+					mcp.push(item);
+					mcpPrompts.push(item);
 				}
 				if (RE_OPTION_MCP_ELICITATION.test(line)) {
-					mcp.push({
-						label: "elicitation option",
+					const rpcName = getLastRpcBefore(i);
+					const item: LocationItem = {
+						label: rpcName ? `elicitation · ${rpcName}` : "elicitation option",
 						detail: "mcp.protobuf.elicitation",
 						documentation: getLeadingComment(lines, i),
 						uri,
 						range: new vscode.Range(i, 0, i, line.length),
 						icon: "question",
-					});
+						rpcName,
+						mcpKind: "elicitation",
+					};
+					mcp.push(item);
+					mcpElicitation.push(item);
 				}
 			}
 		} catch {
@@ -196,11 +293,22 @@ export async function scanWorkspaceProto(
 		}
 	}
 
+	services.sort((a, b) => a.name.localeCompare(b.name));
 	rpcs.sort((a, b) => a.label.localeCompare(b.label));
 	resources.sort((a, b) => a.label.localeCompare(b.label));
 	messages.sort((a, b) => a.label.localeCompare(b.label));
 	mcp.sort((a, b) => (a.detail ?? a.label).localeCompare(b.detail ?? b.label));
 	others.sort((a, b) => a.label.localeCompare(b.label));
 
-	return { rpcs, resources, messages, mcp, others };
+	return {
+		services,
+		rpcs,
+		resources,
+		messages,
+		mcp,
+		mcpTools,
+		mcpElicitation,
+		mcpPrompts,
+		others,
+	};
 }

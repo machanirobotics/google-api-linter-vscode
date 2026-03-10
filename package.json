@@ -177,6 +177,10 @@
 				"title": "Google API Linter: Lint All Proto Files in Workspace"
 			},
 			{
+				"command": "googleApiLinter.formatAllProtos",
+				"title": "Google API Linter: Format All Proto Files"
+			},
+			{
 				"command": "googleApiLinter.createConfig",
 				"title": "Google API Linter: Create Config File"
 			},

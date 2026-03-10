@@ -372,6 +372,11 @@ npm run package
 code --install-extension google-api-linter-1.0.0.vsix
 ```
 
+### Publishing to the Marketplace
+
+Creating a **GitHub Release** (e.g. tag `v1.2.0`) runs the [Release workflow](.github/workflows/release.yaml): it builds the extension, uploads the `.vsix` to the release, and **publishes to the VS Code Marketplace** (for non-prerelease releases).  
+Add the `VSCE_PAT` secret to the repo as described in [.github/SECRETS.md](.github/SECRETS.md).
+
 ### Project Structure
 
 ```

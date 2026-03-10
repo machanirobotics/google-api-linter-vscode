@@ -31,8 +31,13 @@ jobs:
       - name: Extract version from release tag
         id: get-version
         run: |
-          # Remove 'v' prefix from tag (e.g., v1.2.0 -> 1.2.0)
-          VERSION=${GITHUB_REF#refs/tags/v}
+          # Release event: use tag from release; workflow_dispatch: use input
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          VERSION=${VERSION#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Release version: $VERSION"
 
@@ -63,7 +68,7 @@ jobs:
           asset_content_type: application/vsix
 
       - name: Publish to VS Code Marketplace
-        if: github.event.release.prerelease == false
+        if: github.event_name == 'release' && github.event.release.prerelease == false
         run: bun run publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}

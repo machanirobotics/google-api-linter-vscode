@@ -1,0 +1,36 @@
+# CI: uses biome.json for format/lint, package.json scripts for build/typecheck.
+# Dependabot (see .github/dependabot.yaml) can bump @biomejs/biome and this workflow re-runs on push.
+name: CI
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Biome format check (biome.json)
+        run: bun run format:check
+
+      # Optional: uncomment when lint issues are fixed — bun run lint:biome
+      - name: ESLint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
+
+      - name: Type check
+        run: bun run typecheck

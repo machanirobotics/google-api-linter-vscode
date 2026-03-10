@@ -1,0 +1,35 @@
+# Dependabot: npm + GitHub Actions. Biome is in dev-dependencies and grouped; CI (lint.yaml) uses biome.json.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    reviewers:
+      - machanirobotics/engineering
+    labels:
+      - dependencies
+    groups:
+      protobuf:
+        patterns:
+          - "@protobuf-ts/*"
+          - google-protobuf
+          - grpc-web
+      dev-dependencies:
+        dependency-type: development
+      biome:
+        patterns:
+          - "@biomejs/biome"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - ci
+      - dependencies

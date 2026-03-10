@@ -1,33 +1,33 @@
+import * as cp from "node:child_process";
 import {
-  createConnection,
-  TextDocuments,
-  Diagnostic,
-  DiagnosticSeverity,
-  ProposedFeatures,
-  InitializeParams,
-  DidChangeConfigurationNotification,
-  TextDocumentSyncKind,
-  InitializeResult,
-} from 'vscode-languageserver/node';
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import * as cp from 'child_process';
-import { BinaryManager } from './binaryManager';
-import { buildLinterArgs, parseLinterOutput } from './utils/linterUtils';
-import { LinterOptions } from './types';
+	createConnection,
+	type Diagnostic,
+	DiagnosticSeverity,
+	DidChangeConfigurationNotification,
+	type InitializeParams,
+	type InitializeResult,
+	ProposedFeatures,
+	TextDocumentSyncKind,
+	TextDocuments,
+} from "vscode-languageserver/node";
+import { TextDocument } from "vscode-languageserver-textdocument";
+import { BinaryManager } from "./binaryManager";
+import type { LinterOptions } from "./types";
+import { buildLinterArgs, parseLinterOutput } from "./utils/linterUtils";
 
 /**
  * Extension settings structure for the language server.
  */
 interface ExtensionSettings {
-  binaryPath: string;
-  additionalArgs: string[];
-  configPath: string;
+	binaryPath: string;
+	additionalArgs: string[];
+	configPath: string;
 }
 
 const defaultSettings: ExtensionSettings = {
-  binaryPath: 'api-linter',
-  additionalArgs: [],
-  configPath: ''
+	binaryPath: "api-linter",
+	additionalArgs: [],
+	configPath: "",
 };
 
 /** Language server connection */
@@ -49,51 +49,56 @@ let hasWorkspaceFolderCapability = false;
 let globalSettings: ExtensionSettings = defaultSettings;
 
 connection.onInitialize((params: InitializeParams) => {
-  connection.console.log('Language Server initializing...');
-  const capabilities = params.capabilities;
+	connection.console.log("Language Server initializing...");
+	const capabilities = params.capabilities;
 
-  hasConfigurationCapability = !!(
-    capabilities.workspace && !!capabilities.workspace.configuration
-  );
-  hasWorkspaceFolderCapability = !!(
-    capabilities.workspace && !!capabilities.workspace.workspaceFolders
-  );
-  
-  connection.console.log(`Configuration capability: ${hasConfigurationCapability}`);
+	hasConfigurationCapability = !!(
+		capabilities.workspace && !!capabilities.workspace.configuration
+	);
+	hasWorkspaceFolderCapability = !!(
+		capabilities.workspace && !!capabilities.workspace.workspaceFolders
+	);
 
-  const result: InitializeResult = {
-    capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
-    }
-  };
+	connection.console.log(
+		`Configuration capability: ${hasConfigurationCapability}`,
+	);
 
-  if (hasWorkspaceFolderCapability) {
-    result.capabilities.workspace = {
-      workspaceFolders: {
-        supported: true
-      }
-    };
-  }
+	const result: InitializeResult = {
+		capabilities: {
+			textDocumentSync: TextDocumentSyncKind.Incremental,
+		},
+	};
 
-  return result;
+	if (hasWorkspaceFolderCapability) {
+		result.capabilities.workspace = {
+			workspaceFolders: {
+				supported: true,
+			},
+		};
+	}
+
+	return result;
 });
 
 connection.onInitialized(() => {
-  if (hasConfigurationCapability) {
-    connection.client.register(DidChangeConfigurationNotification.type, undefined);
-  }
+	if (hasConfigurationCapability) {
+		connection.client.register(
+			DidChangeConfigurationNotification.type,
+			undefined,
+		);
+	}
 });
 
-connection.onDidChangeConfiguration(change => {
-  if (hasConfigurationCapability) {
-    documentSettings.clear();
-  } else {
-    globalSettings = <ExtensionSettings>(
-      (change.settings.googleApiLinter || defaultSettings)
-    );
-  }
+connection.onDidChangeConfiguration((change) => {
+	if (hasConfigurationCapability) {
+		documentSettings.clear();
+	} else {
+		globalSettings = <ExtensionSettings>(
+			(change.settings.googleApiLinter || defaultSettings)
+		);
+	}
 
-  documents.all().forEach(validateTextDocument);
+	documents.all().forEach(validateTextDocument);
 });
 
 /**
@@ -102,26 +107,26 @@ connection.onDidChangeConfiguration(change => {
  * @returns Promise resolving to the settings
  */
 function getDocumentSettings(resource: string): Thenable<ExtensionSettings> {
-  if (!hasConfigurationCapability) {
-    return Promise.resolve(globalSettings);
-  }
-  let result = documentSettings.get(resource);
-  if (!result) {
-    result = connection.workspace.getConfiguration({
-      scopeUri: resource,
-      section: 'gapi'
-    });
-    documentSettings.set(resource, result);
-  }
-  return result;
+	if (!hasConfigurationCapability) {
+		return Promise.resolve(globalSettings);
+	}
+	let result = documentSettings.get(resource);
+	if (!result) {
+		result = connection.workspace.getConfiguration({
+			scopeUri: resource,
+			section: "gapi",
+		});
+		documentSettings.set(resource, result);
+	}
+	return result;
 }
 
-documents.onDidClose(e => {
-  documentSettings.delete(e.document.uri);
+documents.onDidClose((e) => {
+	documentSettings.delete(e.document.uri);
 });
 
-documents.onDidChangeContent(change => {
-  validateTextDocument(change.document);
+documents.onDidChangeContent((change) => {
+	validateTextDocument(change.document);
 });
 
 /**
@@ -129,31 +134,33 @@ documents.onDidChangeContent(change => {
  * @param textDocument - The document to validate
  */
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-  const settings = await getDocumentSettings(textDocument.uri);
-  
-  const filePath = textDocument.uri.replace('file://', '');
-  
-  if (!filePath.endsWith('.proto')) {
-    return;
-  }
+	const settings = await getDocumentSettings(textDocument.uri);
 
-  connection.console.log(`Validating document: ${filePath}`);
+	const filePath = textDocument.uri.replace("file://", "");
 
-  try {
-    const binaryManager = new BinaryManager({
-      appendLine: (msg: string) => connection.console.log(msg)
-    } as any);
-    
-    const binaryPath = await binaryManager.ensureBinary();
-    connection.console.log(`Using binary: ${binaryPath}`);
-    
-    const diagnostics = await runLinter(binaryPath, filePath, settings);
-    connection.console.log(`Found ${diagnostics.length} diagnostic(s) for ${filePath}`);
-    
-    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-  } catch (error) {
-    connection.console.error(`Error linting ${filePath}: ${error}`);
-  }
+	if (!filePath.endsWith(".proto")) {
+		return;
+	}
+
+	connection.console.log(`Validating document: ${filePath}`);
+
+	try {
+		const binaryManager = new BinaryManager({
+			appendLine: (msg: string) => connection.console.log(msg),
+		} as any);
+
+		const binaryPath = await binaryManager.ensureBinary();
+		connection.console.log(`Using binary: ${binaryPath}`);
+
+		const diagnostics = await runLinter(binaryPath, filePath, settings);
+		connection.console.log(
+			`Found ${diagnostics.length} diagnostic(s) for ${filePath}`,
+		);
+
+		connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+	} catch (error) {
+		connection.console.error(`Error linting ${filePath}: ${error}`);
+	}
 }
 
 /**
@@ -164,70 +171,70 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
  * @returns Array of diagnostics
  */
 async function runLinter(
-  binaryPath: string,
-  filePath: string,
-  settings: ExtensionSettings
+	binaryPath: string,
+	filePath: string,
+	settings: ExtensionSettings,
 ): Promise<Diagnostic[]> {
-  return new Promise((resolve, reject) => {
-    const options: LinterOptions = {
-      configPath: settings.configPath,
-      protoPath: [],
-      disableRules: [],
-      enableRules: [],
-      setExitStatus: false
-    };
+	return new Promise((resolve, reject) => {
+		const options: LinterOptions = {
+			configPath: settings.configPath,
+			protoPath: [],
+			disableRules: [],
+			enableRules: [],
+			setExitStatus: false,
+		};
 
-    const { args, workingDir } = buildLinterArgs(filePath, options);
-    args.push(...settings.additionalArgs);
+		const { args, workingDir } = buildLinterArgs(filePath, options);
+		args.push(...settings.additionalArgs);
 
-    const process = cp.spawn(binaryPath, args, { cwd: workingDir });
+		const process = cp.spawn(binaryPath, args, { cwd: workingDir });
 
-    let stdout = '';
-    let stderr = '';
+		let stdout = "";
+		let stderr = "";
 
-    process.stdout.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
+		process.stdout.on("data", (data: Buffer) => {
+			stdout += data.toString();
+		});
 
-    process.stderr.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
+		process.stderr.on("data", (data: Buffer) => {
+			stderr += data.toString();
+		});
 
-    process.on('error', (error: Error) => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        reject(new Error(`api-linter binary not found at: ${binaryPath}`));
-      } else {
-        reject(error);
-      }
-    });
+		process.on("error", (error: Error) => {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+				reject(new Error(`api-linter binary not found at: ${binaryPath}`));
+			} else {
+				reject(error);
+			}
+		});
 
-    process.on('close', (code: number) => {
-      if (stderr) {
-        connection.console.log(`stderr: ${stderr}`);
-      }
+		process.on("close", (code: number) => {
+			if (stderr) {
+				connection.console.log(`stderr: ${stderr}`);
+			}
 
-      if (code !== 0 && code !== 1) {
-        connection.console.log(`api-linter exited with code ${code}`);
-        reject(new Error(`api-linter exited with code ${code}`));
-        return;
-      }
+			if (code !== 0 && code !== 1) {
+				connection.console.log(`api-linter exited with code ${code}`);
+				reject(new Error(`api-linter exited with code ${code}`));
+				return;
+			}
 
-      try {
-        const vscDiagnostics = parseLinterOutput(stdout);
-        const diagnostics = vscDiagnostics.map(d => ({
-          severity: DiagnosticSeverity.Error,
-          range: d.range,
-          message: d.message,
-          source: d.source,
-          code: typeof d.code === 'object' ? d.code.value : d.code
-        }));
-        resolve(diagnostics);
-      } catch (error) {
-        connection.console.error(`Failed to parse linter output: ${error}`);
-        resolve([]);
-      }
-    });
-  });
+			try {
+				const vscDiagnostics = parseLinterOutput(stdout);
+				const diagnostics = vscDiagnostics.map((d) => ({
+					severity: DiagnosticSeverity.Error,
+					range: d.range,
+					message: d.message,
+					source: d.source,
+					code: typeof d.code === "object" ? d.code.value : d.code,
+				}));
+				resolve(diagnostics);
+			} catch (error) {
+				connection.console.error(`Failed to parse linter output: ${error}`);
+				resolve([]);
+			}
+		});
+	});
 }
 
 documents.listen(connection);

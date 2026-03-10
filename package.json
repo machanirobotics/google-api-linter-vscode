@@ -1,210 +1,249 @@
 {
-  "name": "google-api-linter",
-  "displayName": "Google API Linter",
-  "description": "Google API Linter for VS Code - Production Grade API Design",
-  "version": "1.3.0",
-  "publisher": "machanirobotics",
-  "icon": "picon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/machanirobotics/google-api-linter-vscode"
-  },
-  "engines": {
-    "vscode": "^1.107.0"
-  },
-  "categories": [
-    "Linters",
-    "Programming Languages"
-  ],
-  "activationEvents": [
-    "workspaceContains:workspace.protobuf.yaml",
-    "workspaceContains:**/*.proto"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "languages": [
-      {
-        "id": "proto3",
-        "aliases": [
-          "Protocol Buffers",
-          "proto"
-        ],
-        "extensions": [
-          ".proto"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "proto3",
-        "scopeName": "source.proto",
-        "path": "./syntaxes/proto3.tmLanguage.json"
-      }
-    ],
-    "snippets": [
-      {
-        "language": "proto3",
-        "path": "./snippets/proto3.json"
-      }
-    ],
-    "configuration": {
-      "title": "Google API Linter",
-      "properties": {
-        "gapi.binaryPath": {
-          "type": "string",
-          "default": "api-linter",
-          "description": "Path to the api-linter binary. If not set, assumes 'api-linter' is in PATH."
-        },
-        "gapi.enableOnSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Run linter automatically when saving proto files."
-        },
-        "gapi.enableOnType": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run linter automatically while typing (may impact performance)."
-        },
-        "gapi.configPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to api-linter configuration file (.api-linter.yaml)."
-        },
-        "gapi.protoPath": {
-          "type": "array",
-          "default": [],
-          "description": "Additional folders for searching proto imports. May be specified multiple times.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "gapi.disableRules": {
-          "type": "array",
-          "default": [],
-          "description": "Disable specific rules by name (e.g., 'core::0192::has-comments').",
-          "items": {
-            "type": "string"
-          }
-        },
-        "gapi.enableRules": {
-          "type": "array",
-          "default": [],
-          "description": "Enable specific rules by name.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "gapi.descriptorSetIn": {
-          "type": "array",
-          "default": [],
-          "description": "File containing a FileDescriptorSet for searching proto imports.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "gapi.ignoreCommentDisables": {
-          "type": "boolean",
-          "default": false,
-          "description": "If true, disable comments in proto files will be ignored."
-        },
-        "gapi.setExitStatus": {
-          "type": "boolean",
-          "default": false,
-          "description": "Return exit status 1 when lint errors are found."
-        },
-        "gapi.rulesDocumentationEndpoint": {
-          "type": "string",
-          "default": "https://linter.aip.dev",
-          "description": "Base URL for rule documentation. Change to localhost for local development (e.g., 'http://localhost:8080')."
-        }
-      }
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "google-api-linter",
-          "title": "Proto",
-          "icon": "picon.png"
-        }
-      ]
-    },
-    "views": {
-      "google-api-linter": [
-        {
-          "id": "googleApiLinter.views.proto",
-          "name": "API Linter",
-          "contextualTitle": "API Linter"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "googleApiLinter.lintCurrentFile",
-        "title": "Google API Linter: Lint Current File"
-      },
-      {
-        "command": "googleApiLinter.lintWorkspace",
-        "title": "Google API Linter: Lint All Proto Files in Workspace"
-      },
-      {
-        "command": "googleApiLinter.createConfig",
-        "title": "Google API Linter: Create Config File"
-      },
-      {
-        "command": "googleApiLinter.restart",
-        "title": "Google API Linter: Restart"
-      },
-      {
-        "command": "googleApiLinter.updateGoogleapisCommit",
-        "title": "Google API Linter: Update googleapis Commit"
-      },
-      {
-        "command": "googleApiLinter.reinstallAll",
-        "title": "Google API Linter: Reinstall All Dependencies"
-      },
-      {
-        "command": "googleApiLinter.refreshProtoView",
-        "title": "Google API Linter: Refresh Proto View"
-      },
-      {
-        "command": "googleApiLinter.initWorkspace",
-        "title": "Google API Linter: Initialize Proto Workspace"
-      },
-      {
-        "command": "googleApiLinter.revealLocation",
-        "title": "Reveal in Editor"
-      }
-    ]
-  },
-  "scripts": {
-    "vscode:prepublish": "bun run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "bun run compile",
-    "test": "bun run compile && node out/test/runTest.js",
-    "test:e2e": "bun run compile && node out/test/runTest.js",
-    "lint": "eslint src --ext ts",
-    "package": "vsce package",
-    "publish": "vsce publish",
-    "build:local": "bun run compile && bun run package",
-    "test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
-  },
-  "dependencies": {
-    "fast-glob": "^3.3.3",
-    "vscode-languageclient": "^9.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^18.0.0",
-    "@types/vscode": "^1.75.0",
-    "@vscode/test-electron": "^2.4.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "@vscode/vsce": "^2.19.0",
-    "eslint": "^8.0.0",
-    "typedoc": "^0.28.15",
-    "typescript": "^5.0.0",
-    "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.12"
-  }
+	"name": "google-api-linter",
+	"displayName": "Google API Linter",
+	"description": "Google API Linter for VS Code - Production Grade API Design",
+	"version": "1.3.0",
+	"publisher": "machanirobotics",
+	"icon": "picon.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/machanirobotics/google-api-linter-vscode"
+	},
+	"engines": {
+		"vscode": "^1.110.0"
+	},
+	"categories": [
+		"Linters",
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"workspaceContains:workspace.protobuf.yaml",
+		"workspaceContains:**/*.proto"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "proto3",
+				"aliases": [
+					"Protocol Buffers",
+					"proto"
+				],
+				"extensions": [
+					".proto"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "proto3",
+				"scopeName": "source.proto",
+				"path": "./syntaxes/proto3.tmLanguage.json"
+			}
+		],
+		"snippets": [
+			{
+				"language": "proto3",
+				"path": "./snippets/proto3.json"
+			}
+		],
+		"configuration": {
+			"title": "Google API Linter",
+			"properties": {
+				"gapi.binaryPath": {
+					"type": "string",
+					"default": "api-linter",
+					"description": "Path to the api-linter binary. If not set, assumes 'api-linter' is in PATH."
+				},
+				"gapi.enableOnSave": {
+					"type": "boolean",
+					"default": true,
+					"description": "Run linter automatically when saving proto files."
+				},
+				"gapi.enableOnType": {
+					"type": "boolean",
+					"default": false,
+					"description": "Run linter automatically while typing (may impact performance)."
+				},
+				"gapi.configPath": {
+					"type": "string",
+					"default": "",
+					"description": "Path to api-linter configuration file (.api-linter.yaml)."
+				},
+				"gapi.protoPath": {
+					"type": "array",
+					"default": [],
+					"description": "Additional folders for searching proto imports. May be specified multiple times.",
+					"items": {
+						"type": "string"
+					}
+				},
+				"gapi.disableRules": {
+					"type": "array",
+					"default": [],
+					"description": "Disable specific rules by name (e.g., 'core::0192::has-comments').",
+					"items": {
+						"type": "string"
+					}
+				},
+				"gapi.enableRules": {
+					"type": "array",
+					"default": [],
+					"description": "Enable specific rules by name.",
+					"items": {
+						"type": "string"
+					}
+				},
+				"gapi.descriptorSetIn": {
+					"type": "array",
+					"default": [],
+					"description": "File containing a FileDescriptorSet for searching proto imports.",
+					"items": {
+						"type": "string"
+					}
+				},
+				"gapi.ignoreCommentDisables": {
+					"type": "boolean",
+					"default": false,
+					"description": "If true, disable comments in proto files will be ignored."
+				},
+				"gapi.setExitStatus": {
+					"type": "boolean",
+					"default": false,
+					"description": "Return exit status 1 when lint errors are found."
+				},
+				"gapi.rulesDocumentationEndpoint": {
+					"type": "string",
+					"default": "https://linter.aip.dev",
+					"description": "Base URL for rule documentation. Change to localhost for local development (e.g., 'http://localhost:8080')."
+				},
+				"gapi.formatOnSave": {
+					"type": "boolean",
+					"default": true,
+					"description": "Format .proto files when you save."
+				},
+				"gapi.formatter": {
+					"type": "string",
+					"enum": [
+						"buf",
+						"clang-format",
+						"simple"
+					],
+					"default": "buf",
+					"description": "Formatter to use: 'buf' (buf format), 'clang-format' (ClangFormat for Protobuf), or 'simple' (built-in indent)."
+				},
+				"gapi.clangFormatPath": {
+					"type": "string",
+					"default": "clang-format",
+					"description": "Path to clang-format binary when gapi.formatter is 'clang-format'."
+				}
+			}
+		},
+		"configurationDefaults": {
+			"[proto3]": {
+				"editor.defaultFormatter": "machanirobotics.google-api-linter"
+			},
+			"[protobuf]": {
+				"editor.defaultFormatter": "machanirobotics.google-api-linter"
+			}
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "google-api-linter",
+					"title": "Proto",
+					"icon": "picon.png"
+				}
+			]
+		},
+		"views": {
+			"google-api-linter": [
+				{
+					"id": "googleApiLinter.views.proto",
+					"name": "API Linter",
+					"contextualTitle": "API Linter"
+				}
+			]
+		},
+		"commands": [
+			{
+				"command": "googleApiLinter.lintCurrentFile",
+				"title": "Google API Linter: Lint Current File"
+			},
+			{
+				"command": "googleApiLinter.lintWorkspace",
+				"title": "Google API Linter: Lint All Proto Files in Workspace"
+			},
+			{
+				"command": "googleApiLinter.createConfig",
+				"title": "Google API Linter: Create Config File"
+			},
+			{
+				"command": "googleApiLinter.restart",
+				"title": "Google API Linter: Restart"
+			},
+			{
+				"command": "googleApiLinter.updateGoogleapisCommit",
+				"title": "Google API Linter: Update googleapis Commit"
+			},
+			{
+				"command": "googleApiLinter.reinstallAll",
+				"title": "Google API Linter: Reinstall All Dependencies"
+			},
+			{
+				"command": "googleApiLinter.refreshProtoView",
+				"title": "Google API Linter: Refresh Proto View"
+			},
+			{
+				"command": "googleApiLinter.initWorkspace",
+				"title": "Google API Linter: Initialize Proto Workspace"
+			},
+			{
+				"command": "googleApiLinter.revealLocation",
+				"title": "Reveal in Editor"
+			}
+		]
+	},
+	"scripts": {
+		"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
+		"compile": "tsc --noEmit && node esbuild.js",
+		"build": "npm run compile",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -watch -p ./",
+		"pretest": "bun run compile",
+		"test": "bun run compile && node out/test/runTest.js",
+		"test:e2e": "bun run compile && node out/test/runTest.js",
+		"lint": "eslint src --ext ts",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint:biome": "biome check .",
+		"package": "vsce package",
+		"package:npm": "rm -rf node_modules && npm install && npm run compile && vsce package",
+		"publish": "vsce publish",
+		"build:local": "npm run package:npm",
+		"test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
+	},
+	"overrides": {
+		"glob": "^13.0.0"
+	},
+	"dependencies": {
+		"fast-glob": "^3.3.3",
+		"vscode-languageclient": "^9.0.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.6",
+		"@types/node": "^25.4.0",
+		"@types/vscode": "^1.110.0",
+		"@typescript-eslint/eslint-plugin": "^8.57.0",
+		"@typescript-eslint/parser": "^8.57.0",
+		"@vscode/test-electron": "^2.5.2",
+		"@vscode/vsce": "^3.7.1",
+		"esbuild": "^0.27.3",
+		"eslint": "^10.0.3",
+		"typedoc": "^0.28.17",
+		"typescript": "^5.9.3",
+		"vscode-languageserver": "^9.0.1",
+		"vscode-languageserver-textdocument": "^1.0.12"
+	}
 }

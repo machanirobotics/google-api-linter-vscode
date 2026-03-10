@@ -23,22 +23,22 @@ export const CONFIG_TEMPLATE = `# Google API Linter Configuration
 `;
 
 /** Glob pattern for matching Protocol Buffer files */
-export const PROTO_FILE_PATTERN = '**/*.proto';
+export const PROTO_FILE_PATTERN = "**/*.proto";
 
 /** File extension for Protocol Buffer files */
-export const PROTO_FILE_EXTENSION = '.proto';
+export const PROTO_FILE_EXTENSION = ".proto";
 
 /** Default configuration file name */
-export const CONFIG_FILE_NAME = '.api-linter.yaml';
+export const CONFIG_FILE_NAME = ".api-linter.yaml";
 
 /** Workspace proto config file (enables extension and proto paths) */
-export const WORKSPACE_PROTOBUF_YAML = 'workspace.protobuf.yaml';
+export const WORKSPACE_PROTOBUF_YAML = "workspace.protobuf.yaml";
 
 /** Display name of the extension */
-export const EXTENSION_NAME = 'Google API Linter';
+export const EXTENSION_NAME = "Google API Linter";
 
 /** Source identifier for diagnostics */
-export const DIAGNOSTIC_SOURCE = 'google-api-linter';
+export const DIAGNOSTIC_SOURCE = "google-api-linter";
 
 /** Name of the output channel for logging */
-export const OUTPUT_CHANNEL_NAME = 'Google API Linter';
+export const OUTPUT_CHANNEL_NAME = "Google API Linter";

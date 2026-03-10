@@ -60,11 +60,11 @@ bun run compile
 bun run test:e2e
 ```
 
-Or with npm:
+Or with Bun (default):
 
 ```bash
-npm run compile
-npm run test:e2e
+bun run compile
+bun run test:e2e
 ```
 
 **Note:** The first run downloads a VS Code build into `.vscode-test/` (one-time, ~160MB). If you see "Operation not permitted" or unzip errors, run the command outside a sandbox/restricted environment (e.g. in your local terminal). You can use **manual E2E** (Option A or B above) without downloading anything.

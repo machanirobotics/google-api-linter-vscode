@@ -405,13 +405,13 @@ git clone https://github.com/machanirobotics/google-api-linter-vscode.git
 cd google-api-linter-vscode
 
 # Install dependencies
-npm install
+bun install
 
 # Compile TypeScript
-npm run compile
+bun run compile
 
 # Package extension
-npm run package
+bun run package
 
 # Install locally
 code --install-extension google-api-linter-1.0.0.vsix

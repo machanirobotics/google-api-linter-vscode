@@ -9,6 +9,7 @@
 		"type": "git",
 		"url": "https://github.com/machanirobotics/google-api-linter-vscode"
 	},
+	"packageManager": "bun@1.3.0",
 	"engines": {
 		"vscode": "^1.110.0"
 	},
@@ -208,7 +209,7 @@
 	"scripts": {
 		"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
 		"compile": "tsc --noEmit && node esbuild.js",
-		"build": "npm run compile",
+		"build": "bun run compile",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -watch -p ./",
 		"pretest": "bun run compile",
@@ -218,10 +219,10 @@
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"lint:biome": "biome check .",
-		"package": "vsce package",
-		"package:npm": "rm -rf node_modules && npm install && npm run compile && vsce package",
+		"package": "rm -rf node_modules && bun install && bun run compile && vsce package",
+		"package:npm": "rm -rf node_modules && npm install && bun run compile && vsce package",
 		"publish": "vsce publish",
-		"build:local": "npm run package:npm",
+		"build:local": "bun run package",
 		"test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
 	},
 	"overrides": {

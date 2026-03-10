@@ -4,14 +4,33 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 
 ## Features
 
+### Linting & diagnostics
 - **Real-time Linting**: Automatically validates `.proto` files as you type or save
-- **Syntax Highlighting**: Full Protocol Buffers syntax highlighting with TextMate grammar
 - **Inline Diagnostics**: Displays linting errors and warnings directly in the editor
 - **Hover Documentation**: Shows detailed rule information when hovering over diagnostics
+- **Proto View (Activity Bar)**: Dedicated Proto panel with RPCs, Resources, MCP annotations, and per-file diagnostics—expand any file to see each diagnostic and click to jump to that line
+- **Status Bar**: Shows "Proto" or "Proto: X error(s), Y warning(s)"; click to open the Proto view
+- **Config File Validation**: Warnings for unknown keys and invalid paths in `.api-linter.yaml` and `workspace.protobuf.yaml`
+
+### Editor support
+- **Syntax Highlighting**: Full Protocol Buffers syntax highlighting with TextMate grammar
+- **IntelliSense**: Completions, signature help, and hover for messages, services, RPCs, options (`google.api.http`, `google.api.resource`, `mcp.protobuf.*`), and keywords
+- **Import Path Completion**: After `import "`, suggests `.proto` paths from the workspace and configured proto paths
+- **Format Document**: Format `.proto` files with **buf format** (if installed) or a built-in indent formatter
+- **Code Snippets**: Snippets for proto3, messages, services, RPCs, HTTP/resource options, MCP options, and a full **resource + service** (`resourceservice`) that generates a `_service.proto` with a resource message and List/Get/Create/Update/Delete RPCs
+- **Document Links**: Clickable `import "path/to/file.proto"` links that open the imported file
+- **Go to Definition / Find References**: Navigate to message, enum, and service definitions and find all references
+- **Rename Symbol**: Rename messages, services, enums, and RPCs with updates across the workspace
+- **Code Actions (Quick Fixes)**: Add `(google.api.http)` for RPCs, `(google.api.resource)` for messages, and `_UNSPECIFIED = 0` for enums
+- **Outline & Folding**: Document symbols and folding ranges for messages, services, enums, and oneofs
+
+### Workspace & setup
 - **Automatic Binary Management**: Downloads and updates api-linter binary automatically
 - **Automatic googleapis Integration**: Downloads googleapis protos on first use - no configuration needed
-- **Smart Proto Path Detection**: Automatically detects workspace root and `.gapi/googleapis` directories
+- **Smart Proto Path Detection**: Uses `workspace.protobuf.yaml` and settings for proto paths
 - **Workspace Linting**: Lint all proto files in your workspace with a single command
+- **Initialize Proto Workspace**: Create `workspace.protobuf.yaml` from the Proto view; in multi-root workspaces, init is available per folder
+- **Multi-Root Workspaces**: Proto view and init are scoped per workspace folder when multiple roots are open
 - **Update Notifications**: Prompts when new api-linter versions are available
 - **Configurable Rules**: Enable or disable specific linting rules via configuration
 - **Cross-Platform**: Works on Windows, macOS, and Linux
@@ -219,6 +238,18 @@ For project-specific settings, create `.vscode/settings.json`:
 
 ## Usage
 
+### Proto View (Activity Bar)
+
+Click the **Proto** icon in the Activity Bar to open the API Linter view. You can:
+
+- See **API Linter** status and version
+- Browse **RPCs**, **Resources**, and **MCP**-annotated items; click any item to jump to its definition
+- See all proto files with error/warning counts; **expand a file** to list each diagnostic and click to go to that line
+- **Initialize Proto Workspace** if `workspace.protobuf.yaml` is missing (or per folder in multi-root workspaces)
+- Run **Lint All**, **Lint Current File**, **Create Config File**, or **Restart**
+
+The extension activates when a `.proto` file is present or when `workspace.protobuf.yaml` exists in the workspace.
+
 ### Commands
 
 Access commands via Command Palette (Cmd+Shift+P / Ctrl+Shift+P):
@@ -226,8 +257,12 @@ Access commands via Command Palette (Cmd+Shift+P / Ctrl+Shift+P):
 - **Google API Linter: Lint Current File** - Lint the currently open proto file
 - **Google API Linter: Lint All Proto Files in Workspace** - Lint all `.proto` files in workspace
 - **Google API Linter: Create Config File** - Generate a `.api-linter.yaml` template
+- **Google API Linter: Initialize Proto Workspace** - Create `workspace.protobuf.yaml` in the workspace (or in the chosen folder for multi-root)
 - **Google API Linter: Update googleapis Commit** - Download specific googleapis commit to workspace `.gapi/`
 - **Google API Linter: Restart** - Restart the linter (useful after config changes)
+- **Google API Linter: Refresh Proto View** - Refresh the Proto tree view
+
+Use **Format Document** (or your configured format shortcut) in a `.proto` file to format with buf or the built-in formatter.
 
 ### Automatic Linting
 
@@ -241,6 +276,8 @@ By default, the extension lints proto files:
 Linting results appear:
 - **Inline**: Squiggly underlines in the editor
 - **Problems Panel**: View > Problems (Cmd+Shift+M / Ctrl+Shift+M)
+- **Proto View**: Expand a file in the Proto panel to see each diagnostic; click to go to that line
+- **Status Bar**: "Proto" or "Proto: X error(s), Y warning(s)"—click to focus the Proto view
 - **Hover**: Hover over underlined code to see rule details
 
 ## API Linter Configuration
@@ -257,13 +294,26 @@ disabled_rules:
 enabled_rules:
   - core::0140::prepositions
 
-# Rule-specific configuration
-rule_configs:
-  core::0192::
-    allow_missing_comments: true
+# Additional proto import paths
+proto_paths:
+  - ./proto
+  - ./third_party
 ```
 
+The extension validates this file and `workspace.protobuf.yaml`: it reports **unknown keys** and **invalid paths** (e.g. non-existent `proto_paths` entries) as warnings in the editor.
+
 Refer to the [api-linter documentation](https://linter.aip.dev/) for available rules and configuration options.
+
+### Proto workspace config (`workspace.protobuf.yaml`)
+
+Optional. Create this file (e.g. via **Initialize Proto Workspace** from the Proto view) to enable the extension and set proto paths for the workspace:
+
+```yaml
+# Optional: list of directories containing .proto files (default: this directory)
+proto_path: .
+```
+
+In **multi-root workspaces**, each folder can have its own `workspace.protobuf.yaml`; the Proto view shows one section per folder and offers init per folder when the config is missing.
 
 ## Troubleshooting
 
@@ -327,19 +377,37 @@ code --install-extension google-api-linter-1.0.0.vsix
 ```
 vscode-googleapi-linter/
 ├── src/
-│   ├── extension.ts          # Extension entry point
-│   ├── linterProvider.ts     # Core linting logic
-│   ├── binaryManager.ts      # Binary execution handler
-│   ├── hoverProvider.ts      # Hover documentation
-│   ├── commands.ts           # Command implementations
-│   ├── constants.ts          # Shared constants
-│   ├── types.ts              # TypeScript type definitions
-│   └── utils/                # Utility functions
-├── package.json              # Extension manifest
-├── tsconfig.json             # TypeScript configuration
+│   ├── extension.ts           # Extension entry point
+│   ├── linterProvider.ts      # Core linting logic
+│   ├── binaryManager.ts       # Binary execution handler
+│   ├── hoverProvider.ts       # Hover documentation
+│   ├── commands.ts            # Command implementations
+│   ├── constants.ts           # Shared constants
+│   ├── types.ts               # TypeScript type definitions
+│   ├── protoView.ts           # Proto activity bar view (RPCs, resources, MCP, diagnostics)
+│   ├── statusBar.ts           # Status bar item
+│   ├── formatProvider.ts      # Format document (buf / simple formatter)
+│   ├── configValidator.ts     # Validation for .api-linter.yaml and workspace.protobuf.yaml
+│   ├── completionProvider.ts # IntelliSense and import path completion
+│   ├── signatureHelpProvider.ts
+│   ├── documentSymbolProvider.ts
+│   ├── workspaceSymbolProvider.ts
+│   ├── definitionProvider.ts
+│   ├── referenceProvider.ts
+│   ├── renameProvider.ts
+│   ├── codeActionProvider.ts
+│   ├── documentLinkProvider.ts
+│   ├── foldingProvider.ts
+│   ├── symbolHoverProvider.ts
+│   ├── protoScanner.ts        # Scan workspace for RPCs, resources, MCP
+│   └── utils/                 # fileUtils, configReader, protoParser, linterUtils, etc.
+├── snippets/
+│   └── proto3.json            # Proto3, MCP, and resource+service (CRUD) snippets
+├── package.json               # Extension manifest
+├── tsconfig.json              # TypeScript configuration
 └── .github/
     └── workflows/
-        └── release.yaml      # CI/CD pipeline
+        └── release.yaml       # CI/CD pipeline
 ```
 
 ## Contributing

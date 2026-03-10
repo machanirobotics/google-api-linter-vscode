@@ -3,6 +3,20 @@ import { ApiLinterProvider } from './linterProvider';
 import { ApiLinterHoverProvider } from './hoverProvider';
 import { EXTENSION_NAME, OUTPUT_CHANNEL_NAME, PROTO_FILE_PATTERN, DIAGNOSTIC_SOURCE } from './constants';
 import { ProtoDefinitionProvider } from './definitionProvider';
+import { ProtoCompletionProvider } from './completionProvider';
+import { ProtoSignatureHelpProvider } from './signatureHelpProvider';
+import { ProtoDocumentSymbolProvider } from './documentSymbolProvider';
+import { ProtoWorkspaceSymbolProvider } from './workspaceSymbolProvider';
+import { ProtoReferenceProvider } from './referenceProvider';
+import { ProtoRenameProvider } from './renameProvider';
+import { ProtoCodeActionProvider } from './codeActionProvider';
+import { ProtoDocumentLinkProvider } from './documentLinkProvider';
+import { registerFormatProvider } from './formatProvider';
+import { registerConfigValidation } from './configValidator';
+import { registerStatusBar } from './statusBar';
+import { ProtoSymbolHoverProvider } from './symbolHoverProvider';
+import { ProtoFoldingRangeProvider } from './foldingProvider';
+import { registerProtoView } from './protoView';
 import { isProtoFile, getActiveProtoEditor } from './utils/fileUtils';
 import {
   createLintCurrentFileCommand,
@@ -11,6 +25,7 @@ import {
   createRestartCommand,
   createUpdateGoogleapisCommitCommand,
   createReinstallCommand,
+  createInitWorkspaceCommand,
 } from './commands';
 
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -51,11 +66,26 @@ export async function activate(context: vscode.ExtensionContext) {
     
     vscode.window.showInformationMessage(`${EXTENSION_NAME} activated! Check Output panel.`);
 
+    const protoDocSelector = [
+      { scheme: 'file', language: 'proto3' },
+      { scheme: 'file', language: 'protobuf' },
+    ];
     context.subscriptions.push(
       diagnosticCollection,
       outputChannel,
       registerHoverProvider(diagnosticCollection),
+      registerSymbolHoverProvider(protoDocSelector),
       registerDefinitionProvider(),
+      registerReferenceProvider(protoDocSelector),
+      registerRenameProvider(protoDocSelector),
+      registerCodeActionProvider(protoDocSelector),
+      registerDocumentLinkProvider(protoDocSelector),
+      registerFormatProvider(protoDocSelector),
+      registerDocumentSymbolProvider(protoDocSelector),
+      registerWorkspaceSymbolProvider(),
+      registerFoldingProvider(protoDocSelector),
+      registerCompletionProvider(protoDocSelector),
+      registerSignatureHelpProvider(protoDocSelector),
     );
     context.subscriptions.push(createLintCurrentFileCommand(linterProvider));
     context.subscriptions.push(createLintWorkspaceCommand(linterProvider));
@@ -63,6 +93,19 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(createRestartCommand(diagnosticCollection, linterProvider));
     context.subscriptions.push(createUpdateGoogleapisCommitCommand());
     context.subscriptions.push(createReinstallCommand(binaryManager));
+    context.subscriptions.push(createInitWorkspaceCommand());
+
+    registerProtoView(
+      context,
+      diagnosticCollection,
+      () => binaryManager.getBinaryVersion(),
+      () => binaryManager.getGoogleapisCommit()
+    );
+
+    registerStatusBar(context, diagnosticCollection);
+
+    const configDiagnosticCollection = vscode.languages.createDiagnosticCollection(`${DIAGNOSTIC_SOURCE}-config`);
+    registerConfigValidation(context, configDiagnosticCollection);
 
     registerDocumentListeners(context, linterProvider);
     lintActiveProtoFile();
@@ -89,6 +132,13 @@ function registerHoverProvider(diagnosticCollection: vscode.DiagnosticCollection
 }
 
 /**
+ * Registers hover for proto symbols (message, service, enum, rpc) when no linter diagnostic at position.
+ */
+function registerSymbolHoverProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerHoverProvider(selector, new ProtoSymbolHoverProvider());
+}
+
+/**
  * Registers the definition provider for go-to-definition on proto types.
  * @returns Disposable for the definition provider registration
  */
@@ -101,6 +151,77 @@ function registerDefinitionProvider(): vscode.Disposable {
     ],
     definitionProvider
   );
+}
+
+/**
+ * Registers find references for message/enum/service types.
+ */
+function registerReferenceProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerReferenceProvider(selector, new ProtoReferenceProvider());
+}
+
+/**
+ * Registers rename for message/service/enum/rpc; updates all references.
+ */
+function registerRenameProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerRenameProvider(selector, new ProtoRenameProvider());
+}
+
+/**
+ * Registers code actions: Add (google.api.http), Add (google.api.resource), Add UNSPECIFIED enum value.
+ */
+function registerCodeActionProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerCodeActionsProvider(selector, new ProtoCodeActionProvider(), {
+    providedCodeActionKinds: [vscode.CodeActionKind.QuickFix],
+  });
+}
+
+/**
+ * Registers document links for import "path/to/file.proto" (click to open).
+ */
+function registerDocumentLinkProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerDocumentLinkProvider(selector, new ProtoDocumentLinkProvider());
+}
+
+/**
+ * Registers document outline (Outline view) for message, service, enum, rpc.
+ */
+function registerDocumentSymbolProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerDocumentSymbolProvider(selector, new ProtoDocumentSymbolProvider());
+}
+
+/**
+ * Registers workspace symbol search (Go to Symbol in Workspace).
+ */
+function registerWorkspaceSymbolProvider(): vscode.Disposable {
+  return vscode.languages.registerWorkspaceSymbolProvider(new ProtoWorkspaceSymbolProvider());
+}
+
+/**
+ * Registers folding for message, service, enum, oneof blocks.
+ */
+function registerFoldingProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  return vscode.languages.registerFoldingRangeProvider(selector, new ProtoFoldingRangeProvider());
+}
+
+/**
+ * Registers the completion provider for type hints (messages, services, RPC, options).
+ * @param selector - Document selector for proto files
+ * @returns Disposable for the completion provider registration
+ */
+function registerCompletionProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  const completionProvider = new ProtoCompletionProvider();
+  return vscode.languages.registerCompletionItemProvider(selector, completionProvider);
+}
+
+/**
+ * Registers the signature help provider for RPC and option(...) parameter hints.
+ * @param selector - Document selector for proto files
+ * @returns Disposable for the signature help provider registration
+ */
+function registerSignatureHelpProvider(selector: vscode.DocumentSelector): vscode.Disposable {
+  const signatureHelpProvider = new ProtoSignatureHelpProvider();
+  return vscode.languages.registerSignatureHelpProvider(selector, signatureHelpProvider, '(', ',');
 }
 
 /**

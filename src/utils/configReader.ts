@@ -11,7 +11,7 @@ export interface GapiConfig {
 }
 
 /**
- * Finds workspace.protobuf.yaml file in workspace
+ * Finds workspace.protobuf.yaml file in workspace (first match across all roots).
  */
 export async function findGapiConfigFile(): Promise<vscode.Uri | null> {
   const files = await vscode.workspace.findFiles(
@@ -20,6 +20,19 @@ export async function findGapiConfigFile(): Promise<vscode.Uri | null> {
     1
   );
   return files.length > 0 ? files[0] : null;
+}
+
+/**
+ * Finds workspace.protobuf.yaml in a specific workspace folder (root of that folder).
+ */
+export async function findGapiConfigFileInFolder(folderUri: vscode.Uri): Promise<vscode.Uri | null> {
+  const configPath = vscode.Uri.joinPath(folderUri, "workspace.protobuf.yaml");
+  try {
+    await vscode.workspace.fs.stat(configPath);
+    return configPath;
+  } catch {
+    return null;
+  }
 }
 
 /**

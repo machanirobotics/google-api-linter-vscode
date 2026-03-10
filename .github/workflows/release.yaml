@@ -13,7 +13,9 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write  # Required to upload release assets
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

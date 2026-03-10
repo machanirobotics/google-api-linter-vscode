@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { promisify } from 'util';
 import { ApiLinterProvider } from './linterProvider';
-import { CONFIG_TEMPLATE, CONFIG_FILE_NAME } from './constants';
+import { CONFIG_TEMPLATE, CONFIG_FILE_NAME, WORKSPACE_PROTOBUF_YAML } from './constants';
 import { getActiveProtoEditor, findProtoFiles } from './utils/fileUtils';
 
 const exec = promisify(cp.exec);
@@ -63,6 +63,41 @@ export const createConfigCommand = () => {
       const doc = await vscode.workspace.openTextDocument(configPath);
       await vscode.window.showTextDocument(doc);
       vscode.window.showInformationMessage(`Created ${CONFIG_FILE_NAME} config file`);
+    }
+  );
+};
+
+/** Minimal content for workspace.protobuf.yaml (enables extension and proto paths). */
+const WORKSPACE_PROTOBUF_YAML_TEMPLATE = `# Proto workspace config (Google API Linter)
+# See: https://github.com/machanirobotics/google-api-linter-vscode
+
+# Optional: list of directories containing .proto files (default: this directory)
+# proto_path: .
+`;
+
+/**
+ * Creates the command to initialize a Proto workspace (creates workspace.protobuf.yaml).
+ * @returns Disposable command registration
+ */
+export const createInitWorkspaceCommand = () => {
+  return vscode.commands.registerCommand(
+    'googleApiLinter.initWorkspace',
+    async (folderUri?: vscode.Uri) => {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders?.length) {
+        vscode.window.showErrorMessage('No workspace folder open');
+        return;
+      }
+      const targetFolder = folderUri ?? workspaceFolders[0].uri;
+      const yamlPath = vscode.Uri.joinPath(targetFolder, WORKSPACE_PROTOBUF_YAML);
+      try {
+        await vscode.workspace.fs.writeFile(yamlPath, Buffer.from(WORKSPACE_PROTOBUF_YAML_TEMPLATE, 'utf8'));
+        const doc = await vscode.workspace.openTextDocument(yamlPath);
+        await vscode.window.showTextDocument(doc);
+        vscode.window.showInformationMessage(`Created ${WORKSPACE_PROTOBUF_YAML}. Proto workspace ready.`);
+      } catch (e) {
+        vscode.window.showErrorMessage(`Failed to create ${WORKSPACE_PROTOBUF_YAML}: ${e}`);
+      }
     }
   );
 };

@@ -23,3 +23,12 @@ export const getActiveProtoEditor = (): vscode.TextEditor | undefined => {
 export const findProtoFiles = async (): Promise<vscode.Uri[]> => {
   return vscode.workspace.findFiles('**/*.proto', '**/node_modules/**');
 };
+
+/**
+ * Finds .proto files under a specific workspace folder.
+ */
+export const findProtoFilesInFolder = async (folderUri: vscode.Uri): Promise<vscode.Uri[]> => {
+  const all = await findProtoFiles();
+  const prefix = folderUri.fsPath.replace(/\/?$/, '/');
+  return all.filter((u) => u.fsPath.startsWith(prefix));
+};

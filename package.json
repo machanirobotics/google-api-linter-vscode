@@ -17,8 +17,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "workspaceContains:**/workspace.protobuf.yaml"
+    "workspaceContains:workspace.protobuf.yaml",
+    "workspaceContains:**/*.proto"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -40,6 +40,12 @@
         "language": "proto3",
         "scopeName": "source.proto",
         "path": "./syntaxes/proto3.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "proto3",
+        "path": "./snippets/proto3.json"
       }
     ],
     "configuration": {
@@ -114,6 +120,24 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "google-api-linter",
+          "title": "Proto",
+          "icon": "picon.png"
+        }
+      ]
+    },
+    "views": {
+      "google-api-linter": [
+        {
+          "id": "googleApiLinter.views.proto",
+          "name": "API Linter",
+          "contextualTitle": "API Linter"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "googleApiLinter.lintCurrentFile",
@@ -138,6 +162,18 @@
       {
         "command": "googleApiLinter.reinstallAll",
         "title": "Google API Linter: Reinstall All Dependencies"
+      },
+      {
+        "command": "googleApiLinter.refreshProtoView",
+        "title": "Google API Linter: Refresh Proto View"
+      },
+      {
+        "command": "googleApiLinter.initWorkspace",
+        "title": "Google API Linter: Initialize Proto Workspace"
+      },
+      {
+        "command": "googleApiLinter.revealLocation",
+        "title": "Reveal in Editor"
       }
     ]
   },
@@ -146,11 +182,13 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "bun run compile",
+    "test": "bun run compile && node out/test/runTest.js",
+    "test:e2e": "bun run compile && node out/test/runTest.js",
     "lint": "eslint src --ext ts",
     "package": "vsce package",
     "publish": "vsce publish",
     "build:local": "bun run compile && bun run package",
-    "test:local": "bun run compile && code --extensionDevelopmentPath=$PWD"
+    "test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",
@@ -159,6 +197,7 @@
   "devDependencies": {
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.75.0",
+    "@vscode/test-electron": "^2.4.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/vsce": "^2.19.0",

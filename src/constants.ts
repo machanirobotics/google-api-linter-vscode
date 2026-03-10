@@ -31,6 +31,9 @@ export const PROTO_FILE_EXTENSION = '.proto';
 /** Default configuration file name */
 export const CONFIG_FILE_NAME = '.api-linter.yaml';
 
+/** Workspace proto config file (enables extension and proto paths) */
+export const WORKSPACE_PROTOBUF_YAML = 'workspace.protobuf.yaml';
+
 /** Display name of the extension */
 export const EXTENSION_NAME = 'Google API Linter';
 

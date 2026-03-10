@@ -1,0 +1,293 @@
+{
+  "Proto3 File": {
+    "prefix": "proto3",
+    "body": [
+      "syntax = \"proto3\";",
+      "",
+      "package ${1:my.api.v1};",
+      "",
+      "option go_package = \"${2:example.com/myapi}\";",
+      "",
+      "$0"
+    ],
+    "description": "New proto3 file with syntax, package, and go_package"
+  },
+  "Message": {
+    "prefix": "message",
+    "body": [
+      "message ${1:Name} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Message definition"
+  },
+  "Service": {
+    "prefix": "service",
+    "body": [
+      "service ${1:ServiceName} {",
+      "  rpc ${2:MethodName}(${3:Request}) returns (${4:Response});",
+      "  $0",
+      "}"
+    ],
+    "description": "Service with one RPC"
+  },
+  "RPC Method": {
+    "prefix": "rpc",
+    "body": [
+      "rpc ${1:MethodName}(${2:Request}) returns (${3:Response});",
+      "$0"
+    ],
+    "description": "RPC method"
+  },
+  "RPC with HTTP option": {
+    "prefix": "rpchttp",
+    "body": [
+      "rpc ${1:Get${2:Resource}}(${3:Get${2:Resource}Request}) returns (${4:${2:Resource}}) {",
+      "  option (google.api.http) = {",
+      "    get: \"/v1/${5:resources}/{${6:id}}\";",
+      "  };",
+      "}",
+      "$0"
+    ],
+    "description": "RPC with google.api.http GET mapping"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name} {",
+      "  ${1:Name}_UNSPECIFIED = 0;",
+      "  $0",
+      "}"
+    ],
+    "description": "Enum with UNSPECIFIED first value (AIP-203)"
+  },
+  "Option google.api.http": {
+    "prefix": "optionhttp",
+    "body": [
+      "option (google.api.http) = {",
+      "  ${1|get,post,put,patch,delete|}: \"${2:/v1/path}\";",
+      "  $0",
+      "};"
+    ],
+    "description": "HTTP mapping option"
+  },
+  "Option google.api.resource": {
+    "prefix": "optionresource",
+    "body": [
+      "option (google.api.resource) = {",
+      "  type: \"${1:example.com/Resource}\";",
+      "  pattern: \"${2:resources/{resource_id}}\";",
+      "};",
+      "$0"
+    ],
+    "description": "Resource definition option (AIP-123)"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": [
+      "import \"${1:path/to/file.proto}\";",
+      "$0"
+    ],
+    "description": "Import another proto file"
+  },
+  "Import google.api": {
+    "prefix": "importapi",
+    "body": [
+      "import \"google/api/annotations.proto\";",
+      "$0"
+    ],
+    "description": "Import Google API annotations (for google.api.http)"
+  },
+  "Import MCP annotations": {
+    "prefix": "importmcp",
+    "body": [
+      "import \"mcp/protobuf/annotations.proto\";",
+      "$0"
+    ],
+    "description": "Import MCP protobuf annotations (grpc-mcp-gateway)"
+  },
+  "MCP service option": {
+    "prefix": "mcpservice",
+    "body": [
+      "option (mcp.protobuf.service) = {",
+      "  app: {",
+      "    name: \"${1:My App}\"",
+      "    version: \"${2:1.0.0}\"",
+      "    description: \"${3:A brief description of your application}\"",
+      "  }",
+      "};",
+      "$0"
+    ],
+    "description": "MCP service-level app metadata (name, version, description)"
+  },
+  "MCP tool option": {
+    "prefix": "mcptool",
+    "body": [
+      "option (mcp.protobuf.tool) = {",
+      "  description: \"${1:Description of what this tool does.}\"",
+      "};",
+      "$0"
+    ],
+    "description": "MCP tool option: override name/description on RPC"
+  },
+  "MCP prompt option": {
+    "prefix": "mcpprompt",
+    "body": [
+      "option (mcp.protobuf.prompt) = {",
+      "  name: \"${1:prompt_name}\"",
+      "  description: \"${2:Summarize or describe this prompt}\"",
+      "  schema: \"${3:mypackage.PromptArgs}\"",
+      "};",
+      "$0"
+    ],
+    "description": "MCP prompt template attached to RPC (schema = proto message for args)"
+  },
+  "MCP elicitation option": {
+    "prefix": "mcpelicitation",
+    "body": [
+      "option (mcp.protobuf.elicitation) = {",
+      "  message: \"${1:Are you sure you want to proceed?}\"",
+      "  schema: \"${2:mypackage.Confirmation}\"",
+      "};",
+      "$0"
+    ],
+    "description": "MCP confirmation dialog before RPC executes"
+  },
+  "MCP field option": {
+    "prefix": "mcpfield",
+    "body": [
+      "[(mcp.protobuf.field) = {",
+      "  description: \"${1:Field description for JSON Schema}\"",
+      "  examples: \"${2:example_value}\"",
+      "  format: \"${3|string,uri,date-time|}\"",
+      "} ]",
+      "$0"
+    ],
+    "description": "MCP field options (description, examples, format for tool inputSchema)"
+  },
+  "MCP enum option": {
+    "prefix": "mcpenum",
+    "body": [
+      "option (mcp.protobuf.enum) = { description: \"${1:Enum type description.}\" };",
+      "$0"
+    ],
+    "description": "MCP enum-level description"
+  },
+  "MCP enum value option": {
+    "prefix": "mcpenumvalue",
+    "body": [
+      "[(mcp.protobuf.enum_value) = { description: \"${1:Value description.}\" }]",
+      "$0"
+    ],
+    "description": "MCP description on enum value"
+  },
+  "MCP progress (server streaming)": {
+    "prefix": "mcpprogress",
+    "body": [
+      "import \"mcp/protobuf/progress.proto\";",
+      "",
+      "message ${1:MyRpc}StreamChunk {",
+      "  oneof payload {",
+      "    mcp.protobuf.MCPProgress progress = 1;",
+      "    ${2:MyResponse} result = 2;",
+      "  }",
+      "}",
+      "",
+      "rpc ${1:MyRpc}(${3:MyRequest}) returns (stream ${1:MyRpc}StreamChunk);",
+      "$0"
+    ],
+    "description": "Server-streaming RPC with MCPProgress for progress reporting"
+  },
+  "Resource + Service (CRUD with List)": {
+    "prefix": "resourceservice",
+    "body": [
+      "syntax = \"proto3\";",
+      "",
+      "package ${1:my.api.v1};",
+      "",
+      "option go_package = \"${2:example.com/myapi}\";",
+      "",
+      "import \"google/api/annotations.proto\";",
+      "import \"google/api/resource.proto\";",
+      "import \"google/protobuf/empty.proto\";",
+      "",
+      "// Resource: ${3:Book} (AIP-123).",
+      "message ${3:Book} {",
+      "  option (google.api.resource) = {",
+      "    type: \"${1}.googleapis.com/${3}\";",
+      "    pattern: \"${4:parents/{parent}/books/{book}}\";",
+      "  };",
+      "",
+      "  string name = 1;",
+      "  string display_name = 2;",
+      "  $0",
+      "}",
+      "",
+      "// Request/response messages for ${3}Service.",
+      "message List${3}sRequest {",
+      "  string parent = 1;",
+      "  int32 page_size = 2;",
+      "  string page_token = 3;",
+      "}",
+      "",
+      "message List${3}sResponse {",
+      "  repeated ${3} ${6:books} = 1;",
+      "  string next_page_token = 2;",
+      "}",
+      "",
+      "message Get${3}Request {",
+      "  string name = 1;",
+      "}",
+      "",
+      "message Create${3}Request {",
+      "  string parent = 1;",
+      "  ${3} ${5:book} = 2;",
+      "  string ${5}_id = 3;",
+      "}",
+      "",
+      "message Update${3}Request {",
+      "  ${3} ${5:book} = 1;",
+      "  optional string update_mask = 2;",
+      "}",
+      "",
+      "message Delete${3}Request {",
+      "  string name = 1;",
+      "}",
+      "",
+      "service ${3}Service {",
+      "  rpc List${3}s(List${3}sRequest) returns (List${3}sResponse) {",
+      "    option (google.api.http) = {",
+      "      get: \"/v1/${4:parents/{parent}/books}\";",
+      "    };",
+      "  }",
+      "",
+      "  rpc Get${3}(Get${3}Request) returns (${3}) {",
+      "    option (google.api.http) = {",
+      "      get: \"/v1/${4:parents/{parent}/books/{book}}\";",
+      "    };",
+      "  }",
+      "",
+      "  rpc Create${3}(Create${3}Request) returns (${3}) {",
+      "    option (google.api.http) = {",
+      "      post: \"/v1/${4:parents/{parent}/books}\";",
+      "      body: \"${5:book}\";",
+      "    };",
+      "  }",
+      "",
+      "  rpc Update${3}(Update${3}Request) returns (${3}) {",
+      "    option (google.api.http) = {",
+      "      patch: \"/v1/${4:parents/{parent}/books/{book}}\";",
+      "      body: \"${5:book}\";",
+      "    };",
+      "  }",
+      "",
+      "  rpc Delete${3}(Delete${3}Request) returns (google.protobuf.Empty) {",
+      "    option (google.api.http) = {",
+      "      delete: \"/v1/${4:parents/{parent}/books/{book}}\";",
+      "    };",
+      "  }",
+      "}"
+    ],
+    "description": "Full _service.proto: resource message + service with List, Get, Create, Update, Delete (AIP-style CRUD)"
+  }
+}

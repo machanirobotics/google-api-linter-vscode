@@ -89,10 +89,7 @@ export const createFormatAllProtosCommand = () => {
 						);
 						const options: vscode.FormattingOptions = {
 							tabSize: editorConfig.get<number>("tabSize", 2),
-							insertSpaces: editorConfig.get<boolean>(
-								"insertSpaces",
-								true,
-							),
+							insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
 						};
 						const edits = await getFormatEdits(doc, options);
 						if (edits.length > 0) {

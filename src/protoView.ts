@@ -271,7 +271,9 @@ export class ProtoTreeDataProvider
 		}
 		if (element.kind === "rpcDetail") {
 			const item = new vscode.TreeItem(
-				element.type === "request" ? `Request: ${element.typeName}` : `Response: ${element.typeName}`,
+				element.type === "request"
+					? `Request: ${element.typeName}`
+					: `Response: ${element.typeName}`,
 				vscode.TreeItemCollapsibleState.None,
 			);
 			item.iconPath = new vscode.ThemeIcon("symbol-parameter");
@@ -284,7 +286,11 @@ export class ProtoTreeDataProvider
 			);
 			item.description = `${element.count}`;
 			item.iconPath = new vscode.ThemeIcon(
-				element.id === "tools" ? "tools" : element.id === "elicitation" ? "question" : "comment-discussion",
+				element.id === "tools"
+					? "tools"
+					: element.id === "elicitation"
+						? "question"
+						: "comment-discussion",
 			);
 			return item;
 		}
@@ -421,7 +427,10 @@ export class ProtoTreeDataProvider
 		if (element?.kind === "mcpSubsection") {
 			const scan = await this.getScan();
 			if (element.id === "tools")
-				return scan.mcpTools.map((item) => ({ kind: "location" as const, item }));
+				return scan.mcpTools.map((item) => ({
+					kind: "location" as const,
+					item,
+				}));
 			if (element.id === "elicitation")
 				return scan.mcpElicitation.map((item) => ({
 					kind: "location" as const,

@@ -112,6 +112,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			diagnosticCollection,
 			() => binaryManager.getBinaryVersion(),
 			() => binaryManager.getGoogleapisCommit(),
+			() => binaryManager.getProtobufCommit(),
 		);
 
 		registerStatusBar(context, diagnosticCollection);
@@ -123,7 +124,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		registerConfigValidation(context, configDiagnosticCollection);
 
 		registerDocumentListeners(context, linterProvider);
-		lintActiveProtoFile();
 	} catch (error) {
 		console.error("Failed to activate extension:", error);
 		vscode.window.showErrorMessage(
@@ -376,12 +376,6 @@ function registerDocumentListeners(
 	}
 
 	context.subscriptions.push(
-		vscode.workspace.onDidOpenTextDocument(async (document) => {
-			if (isProtoFile(document.fileName)) {
-				console.log("Proto file opened, linting:", document.fileName);
-				await linterProvider.lintDocument(document);
-			}
-		}),
 		vscode.workspace.onDidChangeConfiguration((e) => {
 			if (e.affectsConfiguration("gapi")) {
 				vscode.window.showInformationMessage(

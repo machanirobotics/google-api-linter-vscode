@@ -14,6 +14,7 @@ export class ApiLinterProvider {
 	private diagnosticCollection: vscode.DiagnosticCollection;
 	private outputChannel: vscode.OutputChannel;
 	private binaryManager: BinaryManager;
+	private workspaceLintInProgress = false;
 
 	/**
 	 * Creates a new linter provider.
@@ -49,35 +50,46 @@ export class ApiLinterProvider {
 		const filePath = document.uri.fsPath;
 		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
 
-		try {
-			const binaryPath = await this.binaryManager.ensureBinary();
-			this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: "Google API Linter",
+				cancellable: false,
+			},
+			async (progress) => {
+				progress.report({ message: "Linting current file…" });
+				try {
+					const binaryPath = await this.binaryManager.ensureBinary();
+					this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
 
-			// Verify binary exists and is executable
-			if (!require("node:fs").existsSync(binaryPath)) {
-				throw new Error(`Binary not found at ${binaryPath} after download`);
-			}
+					if (!require("node:fs").existsSync(binaryPath)) {
+						throw new Error(`Binary not found at ${binaryPath} after download`);
+					}
 
-			// Ensure googleapis and protobuf are downloaded (will skip if already present and up-to-date)
-			await this.binaryManager.ensureGoogleapis();
-			await this.binaryManager.ensureProtobuf();
+					await this.binaryManager.ensureGoogleapis();
+					await this.binaryManager.ensureProtobuf();
 
-			const options = await this.getLinterOptions();
-			const diagnostics = await this.runLinter(binaryPath, filePath, options);
+					const options = await this.getLinterOptions();
+					const diagnostics = await this.runLinter(
+						binaryPath,
+						filePath,
+						options,
+					);
 
-			this.outputChannel.appendLine(
-				`Found ${diagnostics.length} diagnostic(s)`,
-			);
-			this.diagnosticCollection.set(document.uri, diagnostics);
-		} catch (error) {
-			this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
-			if (error instanceof Error) {
-				this.outputChannel.appendLine(`Error stack: ${error.stack}`);
-			}
-			vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
-			// Clear diagnostics on error
-			this.diagnosticCollection.set(document.uri, []);
-		}
+					this.outputChannel.appendLine(
+						`Found ${diagnostics.length} diagnostic(s)`,
+					);
+					this.diagnosticCollection.set(document.uri, diagnostics);
+				} catch (error) {
+					this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
+					if (error instanceof Error) {
+						this.outputChannel.appendLine(`Error stack: ${error.stack}`);
+					}
+					vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
+					this.diagnosticCollection.set(document.uri, []);
+				}
+			},
+		);
 	}
 
 	/**
@@ -151,11 +163,43 @@ export class ApiLinterProvider {
 	}
 
 	/**
-	 * Lints all proto files in the workspace.
+	 * Lints a single file by URI (does not require the document to be open).
+	 */
+	public async lintUri(uri: vscode.Uri): Promise<void> {
+		const filePath = uri.fsPath;
+		if (!filePath.endsWith(".proto")) return;
+
+		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
+		try {
+			const binaryPath = await this.binaryManager.ensureBinary();
+			if (!require("node:fs").existsSync(binaryPath)) {
+				throw new Error(`Binary not found at ${binaryPath} after download`);
+			}
+			await this.binaryManager.ensureGoogleapis();
+			await this.binaryManager.ensureProtobuf();
+			const options = await this.getLinterOptions();
+			const diagnostics = await this.runLinter(binaryPath, filePath, options);
+			this.outputChannel.appendLine(
+				`Found ${diagnostics.length} diagnostic(s)`,
+			);
+			this.diagnosticCollection.set(uri, diagnostics);
+		} catch (error) {
+			this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
+			this.diagnosticCollection.set(uri, []);
+		}
+	}
+
+	/**
+	 * Lints all proto files in the workspace (by path; does not open documents).
 	 */
 	public async lintWorkspace(): Promise<void> {
+		if (this.workspaceLintInProgress) {
+			vscode.window.showInformationMessage(
+				"Workspace lint is already running.",
+			);
+			return;
+		}
 		const protoFiles = await findProtoFiles();
-
 		if (protoFiles.length === 0) {
 			vscode.window.showInformationMessage(
 				"No .proto files found in workspace.",
@@ -163,16 +207,32 @@ export class ApiLinterProvider {
 			return;
 		}
 
-		vscode.window.showInformationMessage(
-			`Linting ${protoFiles.length} proto file(s)...`,
-		);
-
-		for (const fileUri of protoFiles) {
-			const document = await vscode.workspace.openTextDocument(fileUri);
-			await this.lintDocument(document);
+		this.workspaceLintInProgress = true;
+		const total = protoFiles.length;
+		try {
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: "Google API Linter",
+					cancellable: false,
+				},
+				async (progress) => {
+					for (let i = 0; i < protoFiles.length; i++) {
+						progress.report({
+							message: `Linting ${i + 1}/${total}…`,
+							increment: (100 / total) * (i === 0 ? 0 : 1),
+						});
+						await this.lintUri(protoFiles[i]);
+					}
+					progress.report({ message: "Done", increment: 100 });
+				},
+			);
+			vscode.window.showInformationMessage(
+				`Google API Linter: workspace linting completed (${total} file(s)).`,
+			);
+		} finally {
+			this.workspaceLintInProgress = false;
 		}
-
-		vscode.window.showInformationMessage("Workspace linting completed.");
 	}
 
 	/**

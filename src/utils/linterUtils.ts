@@ -1,8 +1,38 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import YAML from "yaml";
 import { CONFIG_FILE_NAME } from "../constants";
 import type { LinterOptions, LinterOutput, LinterProblem } from "../types";
+
+/**
+ * api-linter expects config to be an array of config objects (lint.Configs).
+ * If the file is a single map (e.g. disabled_rules at top level), wrap it in an array
+ * and write to a temp file so the binary can parse it.
+ */
+function resolveConfigToArrayFormat(configPath: string): string {
+	try {
+		const raw = fs.readFileSync(configPath, "utf8");
+		const parsed = YAML.parse(raw);
+		if (parsed === null || typeof parsed !== "object") {
+			return configPath;
+		}
+		if (Array.isArray(parsed)) {
+			return configPath;
+		}
+		// Single map: wrap in array and write to temp file
+		const arrayConfig = [parsed];
+		const tempPath = path.join(
+			os.tmpdir(),
+			`api-linter-config-${Date.now()}-${Math.random().toString(36).slice(2)}.yaml`,
+		);
+		fs.writeFileSync(tempPath, YAML.stringify(arrayConfig), "utf8");
+		return tempPath;
+	} catch {
+		return configPath;
+	}
+}
 
 /**
  * Resolves workspace variables in a path string.
@@ -88,7 +118,8 @@ export const buildLinterArgs = (
 		? resolveWorkspaceVariables(options.configPath, filePath)
 		: findApiLinterConfig(filePath);
 	if (configToUse && fs.existsSync(configToUse)) {
-		args.push("--config", configToUse);
+		const resolvedConfig = resolveConfigToArrayFormat(configToUse);
+		args.push("--config", resolvedConfig);
 	}
 
 	const absolutePath = path.isAbsolute(filePath)

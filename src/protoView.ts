@@ -49,6 +49,7 @@ export type ProtoTreeNode =
 				| "resources"
 				| "mcp"
 				| "files"
+				| "deps"
 				| "rpcs"
 				| "messages"
 				| "others";
@@ -56,6 +57,7 @@ export type ProtoTreeNode =
 			count: number;
 			icon: string;
 	  }
+	| { kind: "dep"; name: string; commit: string }
 	| { kind: "service"; service: ServiceItem }
 	| { kind: "rpc"; rpc: RpcItem; serviceName: string }
 	| { kind: "rpcDetail"; type: "request" | "response"; typeName: string }
@@ -92,6 +94,7 @@ export class ProtoTreeDataProvider
 		private readonly diagnosticCollection: vscode.DiagnosticCollection,
 		private getBinaryVersion: () => Promise<string>,
 		private getGoogleapisCommit: () => Promise<string>,
+		private getProtobufCommit: () => Promise<string>,
 	) {}
 
 	refresh(): void {
@@ -136,6 +139,18 @@ export class ProtoTreeDataProvider
 			);
 			item.description = element.detail ?? element.version;
 			item.iconPath = new vscode.ThemeIcon(element.icon);
+			return item;
+		}
+		if (element.kind === "dep") {
+			const item = new vscode.TreeItem(
+				element.name,
+				vscode.TreeItemCollapsibleState.None,
+			);
+			item.description = element.commit.slice(0, 7);
+			item.iconPath = new vscode.ThemeIcon(
+				"circle-filled",
+				new vscode.ThemeColor("testing.iconPassed"),
+			);
 			return item;
 		}
 		if (element.kind === "init") {
@@ -231,6 +246,7 @@ export class ProtoTreeDataProvider
 				resources: "Messages with google.api.resource",
 				mcp: "MCP: Tools, Elicitation, Prompts (by RPC)",
 				files: "Proto files (green=OK, orange=warning, red=error)",
+				deps: "Dependencies (googleapis, protobuf); green when downloaded",
 				rpcs: "RPC methods in services",
 				messages: "Proto messages",
 				others: "Enums and other definitions",
@@ -388,6 +404,16 @@ export class ProtoTreeDataProvider
 						.localeCompare(vscode.workspace.asRelativePath(b.uri));
 				});
 				return fileNodes;
+			}
+			if (element.id === "deps") {
+				const [googleapisCommit, protobufCommit] = await Promise.all([
+					this.getGoogleapisCommit(),
+					this.getProtobufCommit(),
+				]);
+				return [
+					{ kind: "dep", name: "googleapis", commit: googleapisCommit },
+					{ kind: "dep", name: "protobuf", commit: protobufCommit },
+				];
 			}
 			if (element.id === "rpcs")
 				return scan.rpcs.map((item) => ({ kind: "location" as const, item }));
@@ -572,17 +598,23 @@ export class ProtoTreeDataProvider
 				count: protoUrisForFiles.length,
 				icon: "symbol-file",
 			});
+			roots.push({
+				kind: "section",
+				id: "deps",
+				label: "Deps",
+				count: 2,
+				icon: "package",
+			});
 
 			try {
 				const version = await this.getBinaryVersion();
-				const googleapisCommit = await this.getGoogleapisCommit();
 				const versionStr = version.startsWith("v") ? version : `v${version}`;
 				roots.push({
 					kind: "status",
 					label: "API Linter",
 					version: versionStr,
-					detail: `googleapis: ${googleapisCommit.slice(0, 7)}`,
-					icon: "check-all",
+					detail: undefined,
+					icon: "symbol-misc",
 				});
 			} catch {
 				roots.push({
@@ -603,11 +635,13 @@ export function registerProtoView(
 	diagnosticCollection: vscode.DiagnosticCollection,
 	getBinaryVersion: () => Promise<string>,
 	getGoogleapisCommit: () => Promise<string>,
+	getProtobufCommit: () => Promise<string>,
 ): void {
 	const treeDataProvider = new ProtoTreeDataProvider(
 		diagnosticCollection,
 		getBinaryVersion,
 		getGoogleapisCommit,
+		getProtobufCommit,
 	);
 
 	context.subscriptions.push(

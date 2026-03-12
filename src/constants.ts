@@ -4,22 +4,17 @@
  */
 export const CONFIG_TEMPLATE = `# Google API Linter Configuration
 # See: https://linter.aip.dev/configuration
+# Config must be an array of rule blocks (api-linter lint.Configs).
 
-# Disable specific rules
-# disabled_rules:
-#   - core::0192::has-comments
-
-# Enable specific rules
-# enabled_rules:
-#   - custom::rule::name
-
-# Additional proto import paths
-# proto_paths:
-#   - ./protos
-#   - ./third_party
-
-# Ignore disable comments in proto files
-# ignore_comment_disables: false
+---
+- included_paths:
+    - "**/*.proto"
+  # Disable specific rules
+  disabled_rules:
+    - core::0192::has-comments
+  # Enable specific rules (optional)
+  # enabled_rules:
+  #   - custom::rule::name
 `;
 
 /** Glob pattern for matching Protocol Buffer files */

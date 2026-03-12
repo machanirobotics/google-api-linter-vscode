@@ -3,8 +3,10 @@ import { ProtoCodeActionProvider } from "./codeActionProvider";
 import {
 	createConfigCommand,
 	createFormatAllProtosCommand,
+	createFormatFileFromTreeCommand,
 	createInitWorkspaceCommand,
 	createLintCurrentFileCommand,
+	createLintFileFromTreeCommand,
 	createLintWorkspaceCommand,
 	createReinstallCommand,
 	createRestartCommand,
@@ -100,6 +102,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(createLintCurrentFileCommand(linterProvider));
 		context.subscriptions.push(createLintWorkspaceCommand(linterProvider));
 		context.subscriptions.push(createFormatAllProtosCommand());
+		context.subscriptions.push(createLintFileFromTreeCommand(linterProvider));
+		context.subscriptions.push(createFormatFileFromTreeCommand());
 		context.subscriptions.push(createConfigCommand());
 		context.subscriptions.push(
 			createRestartCommand(diagnosticCollection, linterProvider),

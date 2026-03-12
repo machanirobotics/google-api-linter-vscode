@@ -37,6 +37,11 @@ export class ProtoFormatProvider
 		return raw === "clang-format" || raw === "simple" ? raw : "buf";
 	}
 
+	private getBufPath(): string {
+		const config = vscode.workspace.getConfiguration("gapi");
+		return config.get<string>("bufPath", "buf");
+	}
+
 	private async runFormatter(
 		document: vscode.TextDocument,
 		kind: FormatterKind,
@@ -79,9 +84,10 @@ export class ProtoFormatProvider
 			document.uri.scheme === "file" ? document.uri.fsPath : null;
 		if (filePath && fs.existsSync(filePath) && filePath.endsWith(".proto")) {
 			try {
+				const buf = this.getBufPath();
 				await new Promise<void>((resolve, reject) => {
 					cp.execFile(
-						"buf",
+						buf,
 						["format", "-w", filePath],
 						{ maxBuffer: 10 * 1024 * 1024 },
 						(err) => {
@@ -104,9 +110,10 @@ export class ProtoFormatProvider
 			);
 			fs.writeFileSync(tmpFile, document.getText(), "utf8");
 			tempPath = tmpFile;
+			const buf = this.getBufPath();
 			await new Promise<void>((resolve, reject) => {
 				cp.execFile(
-					"buf",
+					buf,
 					["format", "-w", tmpFile],
 					{ maxBuffer: 10 * 1024 * 1024 },
 					(err) => {

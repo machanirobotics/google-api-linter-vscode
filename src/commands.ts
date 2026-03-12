@@ -58,6 +58,80 @@ export const createLintWorkspaceCommand = (
 };
 
 /**
+ * Command run from Proto view context menu: lint the selected file node.
+ */
+export const createLintFileFromTreeCommand = (
+	linterProvider: ApiLinterProvider,
+) => {
+	return vscode.commands.registerCommand(
+		"googleApiLinter.lintFileFromTree",
+		async (element: unknown) => {
+			if (
+				element &&
+				typeof element === "object" &&
+				"kind" in element &&
+				(element as { kind: string }).kind === "file" &&
+				"uri" in element
+			) {
+				const uri = (element as { uri: vscode.Uri }).uri;
+				if (uri && uri.fsPath.endsWith(".proto")) {
+					await linterProvider.lintUri(uri);
+				}
+			}
+		},
+	);
+};
+
+/**
+ * Command run from Proto view context menu: format the selected file node with buf format -w.
+ */
+export const createFormatFileFromTreeCommand = () => {
+	return vscode.commands.registerCommand(
+		"googleApiLinter.formatFileFromTree",
+		async (element: unknown) => {
+			if (
+				element &&
+				typeof element === "object" &&
+				"kind" in element &&
+				(element as { kind: string }).kind === "file" &&
+				"uri" in element
+			) {
+				const uri = (element as { uri: vscode.Uri }).uri;
+				if (!uri || !uri.fsPath.endsWith(".proto")) return;
+				const filePath = uri.fsPath;
+				try {
+					const bufPath = vscode.workspace
+						.getConfiguration("gapi")
+						.get<string>("bufPath", "buf");
+					await new Promise<void>((resolve, reject) => {
+						cp.execFile(
+							bufPath,
+							["format", "-w", filePath],
+							{ maxBuffer: 10 * 1024 * 1024 },
+							(err) => {
+								if (err) reject(err);
+								else resolve();
+							},
+						);
+					});
+					const doc = vscode.workspace.textDocuments.find(
+						(d) => d.uri.toString() === uri.toString(),
+					);
+					if (doc) await doc.save();
+					vscode.window.showInformationMessage(
+						`Formatted ${vscode.workspace.asRelativePath(uri)}`,
+					);
+				} catch (e) {
+					vscode.window.showErrorMessage(
+						`Format failed: ${e instanceof Error ? e.message : String(e)}`,
+					);
+				}
+			}
+		},
+	);
+};
+
+/**
  * Creates the command to format all proto files in the workspace.
  * @returns Disposable command registration
  */
@@ -80,6 +154,9 @@ export const createFormatAllProtosCommand = () => {
 					cancellable: false,
 				},
 				async (progress) => {
+					const bufPath = vscode.workspace
+						.getConfiguration("gapi")
+						.get<string>("bufPath", "buf");
 					for (let i = 0; i < protoUris.length; i++) {
 						const uri = protoUris[i];
 						const filePath = uri.fsPath;
@@ -87,7 +164,7 @@ export const createFormatAllProtosCommand = () => {
 						try {
 							await new Promise<void>((resolve, reject) => {
 								cp.execFile(
-									"buf",
+									bufPath,
 									["format", "-w", filePath],
 									{ maxBuffer: 10 * 1024 * 1024 },
 									(err) => {

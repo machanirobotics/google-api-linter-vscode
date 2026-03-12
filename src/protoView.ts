@@ -68,6 +68,9 @@ export type ProtoTreeNode =
 			typeName: string;
 			uri?: vscode.Uri;
 			range?: vscode.Range;
+			/** Fallback when type not resolved: go to RPC line */
+			rpcUri?: vscode.Uri;
+			rpcRange?: vscode.Range;
 	  }
 	| {
 			kind: "mcpSubsection";
@@ -76,7 +79,13 @@ export type ProtoTreeNode =
 			count: number;
 	  }
 	| { kind: "location"; item: LocationItem }
-	| { kind: "messageField"; label: string; type: string; uri: vscode.Uri; range: vscode.Range }
+	| {
+			kind: "messageField";
+			label: string;
+			type: string;
+			uri: vscode.Uri;
+			range: vscode.Range;
+	  }
 	| { kind: "messageEnum"; label: string; uri: vscode.Uri; range: vscode.Range }
 	| { kind: "folder"; name: string; uri: vscode.Uri }
 	| { kind: "action"; command: string; label: string; icon: string };
@@ -338,8 +347,11 @@ export class ProtoTreeDataProvider
 				vscode.TreeItemCollapsibleState.None,
 			);
 			item.description = element.typeName;
+			const hasTypeLoc = element.uri && element.range;
 			item.tooltip = new vscode.MarkdownString(
-				`${element.type === "request" ? "Request" : "Response"} message type: **${element.typeName}**\n\nClick to go to definition in file.`,
+				hasTypeLoc
+					? `${element.type === "request" ? "Request" : "Response"} message type: **${element.typeName}**\n\nClick to go to definition in file.`
+					: `**${element.typeName}**\n\nType definition not found; click to go to RPC in file.`,
 			);
 			item.iconPath = new vscode.ThemeIcon(
 				"symbol-class",
@@ -349,11 +361,17 @@ export class ProtoTreeDataProvider
 						: "symbolIcon.methodForeground",
 				),
 			);
-			if (element.uri && element.range) {
+			if (hasTypeLoc) {
 				item.command = {
 					command: "googleApiLinter.revealLocation",
 					title: "Go to type definition",
 					arguments: [element.uri, element.range],
+				};
+			} else if (element.rpcUri && element.rpcRange) {
+				item.command = {
+					command: "googleApiLinter.revealLocation",
+					title: "Go to RPC",
+					arguments: [element.rpcUri, element.rpcRange],
 				};
 			}
 			return item;
@@ -398,7 +416,8 @@ export class ProtoTreeDataProvider
 				treeItem.tooltip = new vscode.MarkdownString(
 					(loc.documentation
 						? `${loc.documentation}\n\n\`${loc.detail ?? ""}\``
-						: (loc.detail ?? loc.label)) + "\n\nClick to go to definition in file.",
+						: (loc.detail ?? loc.label)) +
+						"\n\nClick to go to definition in file.",
 				);
 			} else {
 				treeItem.tooltip = new vscode.MarkdownString(
@@ -566,6 +585,8 @@ export class ProtoTreeDataProvider
 					this.resolveTypeToLocation(resType, contextUri),
 				]);
 			}
+			const rpcUri = element.rpc.uri;
+			const rpcRange = element.rpc.range;
 			return [
 				{
 					kind: "rpcDetail" as const,
@@ -573,6 +594,8 @@ export class ProtoTreeDataProvider
 					typeName: reqType,
 					uri: reqLoc?.uri,
 					range: reqLoc?.range,
+					rpcUri,
+					rpcRange,
 				},
 				{
 					kind: "rpcDetail" as const,
@@ -580,14 +603,13 @@ export class ProtoTreeDataProvider
 					typeName: resType,
 					uri: resLoc?.uri,
 					range: resLoc?.range,
+					rpcUri,
+					rpcRange,
 				},
 			];
 		}
 
-		if (
-			element?.kind === "location" &&
-			element.item.detail === "message"
-		) {
+		if (element?.kind === "location" && element.item.detail === "message") {
 			try {
 				const doc = await vscode.workspace.openTextDocument(element.item.uri);
 				const { fields, enums } = parseMessageBody(

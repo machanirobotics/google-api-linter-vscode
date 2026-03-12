@@ -138,6 +138,11 @@
 					"type": "string",
 					"default": "clang-format",
 					"description": "Path to clang-format binary when gapi.formatter is 'clang-format'."
+				},
+				"gapi.bufPath": {
+					"type": "string",
+					"default": "buf",
+					"description": "Path to buf binary for formatting. If not set, assumes 'buf' is in PATH."
 				}
 			}
 		},
@@ -211,6 +216,14 @@
 			{
 				"command": "googleApiLinter.collapseAll",
 				"title": "Collapse All"
+			},
+			{
+				"command": "googleApiLinter.lintFileFromTree",
+				"title": "Lint this file"
+			},
+			{
+				"command": "googleApiLinter.formatFileFromTree",
+				"title": "Format this file"
 			}
 		],
 		"menus": {
@@ -220,48 +233,61 @@
 					"when": "view == googleApiLinter.views.proto",
 					"group": "navigation"
 				}
+			],
+			"view/item/context": [
+				{
+					"command": "googleApiLinter.lintFileFromTree",
+					"when": "view == googleApiLinter.views.proto",
+					"group": "1_modification"
+				},
+				{
+					"command": "googleApiLinter.formatFileFromTree",
+					"when": "view == googleApiLinter.views.proto",
+					"group": "1_modification"
+				}
 			]
 		},
-	"scripts": {
-		"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
-		"compile": "tsc --noEmit && node esbuild.js",
-		"build": "bun run compile",
-		"typecheck": "tsc --noEmit",
-		"watch": "tsc -watch -p ./",
-		"pretest": "bun run compile",
-		"test": "bun run compile && node out/test/runTest.js",
-		"test:e2e": "bun run compile && node out/test/runTest.js",
-		"lint": "eslint src --ext ts",
-		"format": "biome format --write .",
-		"format:check": "biome format .",
-		"lint:biome": "biome check .",
-		"package": "rm -rf node_modules && bun install && bun run compile && vsce package",
-		"package:npm": "rm -rf node_modules && npm install && bun run compile && vsce package",
-		"publish": "vsce publish",
-		"build:local": "bun run package",
-		"test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
-	},
-	"overrides": {
-		"glob": "^13.0.0"
-	},
-	"dependencies": {
-		"fast-glob": "^3.3.3",
-		"vscode-languageclient": "^9.0.1",
-		"yaml": "^2.8.2"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.4.6",
-		"@types/node": "^25.4.0",
-		"@types/vscode": "^1.110.0",
-		"@typescript-eslint/eslint-plugin": "^8.57.0",
-		"@typescript-eslint/parser": "^8.57.0",
-		"@vscode/test-electron": "^2.5.2",
-		"@vscode/vsce": "^3.7.1",
-		"esbuild": "^0.27.3",
-		"eslint": "^10.0.3",
-		"typedoc": "^0.28.17",
-		"typescript": "^5.9.3",
-		"vscode-languageserver": "^9.0.1",
-		"vscode-languageserver-textdocument": "^1.0.12"
+		"scripts": {
+			"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
+			"compile": "tsc --noEmit && node esbuild.js",
+			"build": "bun run compile",
+			"typecheck": "tsc --noEmit",
+			"watch": "tsc -watch -p ./",
+			"pretest": "bun run compile",
+			"test": "bun run compile && node out/test/runTest.js",
+			"test:e2e": "bun run compile && node out/test/runTest.js",
+			"lint": "eslint src --ext ts",
+			"format": "biome format --write .",
+			"format:check": "biome format .",
+			"lint:biome": "biome check .",
+			"package": "rm -rf node_modules && bun install && bun run compile && vsce package",
+			"package:npm": "rm -rf node_modules && npm install && bun run compile && vsce package",
+			"publish": "vsce publish",
+			"build:local": "bun run package",
+			"test:local": "bun run compile && code --extensionDevelopmentPath=$PWD smoke_test/protobuf"
+		},
+		"overrides": {
+			"glob": "^13.0.0"
+		},
+		"dependencies": {
+			"fast-glob": "^3.3.3",
+			"vscode-languageclient": "^9.0.1",
+			"yaml": "^2.8.2"
+		},
+		"devDependencies": {
+			"@biomejs/biome": "^2.4.6",
+			"@types/node": "^25.4.0",
+			"@types/vscode": "^1.110.0",
+			"@typescript-eslint/eslint-plugin": "^8.57.0",
+			"@typescript-eslint/parser": "^8.57.0",
+			"@vscode/test-electron": "^2.5.2",
+			"@vscode/vsce": "^3.7.1",
+			"esbuild": "^0.27.3",
+			"eslint": "^10.0.3",
+			"typedoc": "^0.28.17",
+			"typescript": "^5.9.3",
+			"vscode-languageserver": "^9.0.1",
+			"vscode-languageserver-textdocument": "^1.0.12"
+		}
 	}
 }

@@ -8,7 +8,7 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Real-time Linting**: Automatically validates `.proto` files as you type or save
 - **Inline Diagnostics**: Displays linting errors and warnings directly in the editor
 - **Hover Documentation**: Shows detailed rule information when hovering over diagnostics
-- **Proto View (Activity Bar)**: Dedicated Proto panel with RPCs, Resources, MCP annotations, and per-file diagnostics—expand any file to see each diagnostic and click to jump to that line
+- **Proto View (Activity Bar)**: Debugger-style sidebar with **Lint**, **Format**, **Reload**; **Services** (expand to RPCs, then Request/Response—click to go to type in file); **Resources**; **MCP** (Tools, Elicitation, Prompts); **Messages** (expand for fields and enums); **Enums**; **Deps** (googleapis, protobuf); **Files** with pastel status (cyan=OK, magenta=warning, blue=error). **Collapse All** in the title bar. Click any item to jump to that symbol or type in the file. Right‑click a file to **Lint** or **Format** that file.
 - **Status Bar**: Shows "Proto" or "Proto: X error(s), Y warning(s)"; click to open the Proto view
 - **Config File Validation**: Warnings for unknown keys and invalid paths in `.api-linter.yaml` and `workspace.protobuf.yaml`
 
@@ -16,7 +16,7 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Syntax Highlighting**: Full Protocol Buffers syntax highlighting with TextMate grammar
 - **IntelliSense**: Completions, signature help, and hover for messages, services, RPCs, options (`google.api.http`, `google.api.resource`, `mcp.protobuf.*`), and keywords
 - **Import Path Completion**: After `import "`, suggests `.proto` paths from the workspace and configured proto paths
-- **Format Document**: Format `.proto` files with **buf format** (if installed) or a built-in indent formatter
+- **Format Document**: Format `.proto` files with **buf format -w** (if `buf` is installed) or a built-in indent formatter; format-on-save uses buf by default
 - **Code Snippets**: Snippets for proto3, messages, services, RPCs, HTTP/resource options, MCP options, and a full **resource + service** (`resourceservice`) that generates a `_service.proto` with a resource message and List/Get/Create/Update/Delete RPCs
 - **Document Links**: Clickable `import "path/to/file.proto"` links that open the imported file
 - **Go to Definition / Find References**: Navigate to message, enum, and service definitions and find all references

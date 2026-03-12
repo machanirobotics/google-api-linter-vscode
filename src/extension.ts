@@ -294,7 +294,7 @@ function registerDocumentListeners(
 	const enableOnType = config.get<boolean>("enableOnType", false);
 	const formatOnSave = config.get<boolean>("formatOnSave", true);
 
-	// Format proto files on save when gapi.formatOnSave is true
+	// Format proto files on save when gapi.formatOnSave is true (uses document buffer, not disk)
 	if (formatOnSave) {
 		context.subscriptions.push(
 			vscode.workspace.onWillSaveTextDocument((event) => {

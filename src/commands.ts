@@ -9,7 +9,6 @@ import {
 	CONFIG_TEMPLATE,
 	WORKSPACE_PROTOBUF_YAML,
 } from "./constants";
-import { getFormatEdits } from "./formatProvider";
 import type { ApiLinterProvider } from "./linterProvider";
 import { findProtoFiles, getActiveProtoEditor } from "./utils/fileUtils";
 
@@ -80,31 +79,36 @@ export const createFormatAllProtosCommand = () => {
 					title: "Formatting proto files",
 					cancellable: false,
 				},
-				async () => {
-					for (const uri of protoUris) {
-						const doc = await vscode.workspace.openTextDocument(uri);
-						const editorConfig = vscode.workspace.getConfiguration(
-							"editor",
-							doc.uri,
-						);
-						const options: vscode.FormattingOptions = {
-							tabSize: editorConfig.get<number>("tabSize", 2),
-							insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
-						};
-						const edits = await getFormatEdits(doc, options);
-						if (edits.length > 0) {
-							const edit = new vscode.WorkspaceEdit();
-							for (const te of edits) {
-								edit.replace(doc.uri, te.range, te.newText);
-							}
-							await vscode.workspace.applyEdit(edit);
+				async (progress) => {
+					for (let i = 0; i < protoUris.length; i++) {
+						const uri = protoUris[i];
+						const filePath = uri.fsPath;
+						progress.report({ message: `${i + 1}/${protoUris.length}` });
+						try {
+							await new Promise<void>((resolve, reject) => {
+								cp.execFile(
+									"buf",
+									["format", "-w", filePath],
+									{ maxBuffer: 10 * 1024 * 1024 },
+									(err) => {
+										if (err) reject(err);
+										else resolve();
+									},
+								);
+							});
 							formatted++;
+							const doc = vscode.workspace.textDocuments.find(
+								(d) => d.uri.toString() === uri.toString(),
+							);
+							if (doc) await doc.save();
+						} catch {
+							// skip failed file
 						}
 					}
 				},
 			);
 			vscode.window.showInformationMessage(
-				`Formatted ${formatted} of ${protoUris.length} proto file(s).`,
+				`Formatted ${formatted} proto file(s) with \`buf format -w\`.`,
 			);
 		},
 	);

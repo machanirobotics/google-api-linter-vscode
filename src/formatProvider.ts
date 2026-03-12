@@ -75,7 +75,26 @@ export class ProtoFormatProvider
 	private async formatWithBuf(
 		document: vscode.TextDocument,
 	): Promise<string | null> {
-		const text = document.getText();
+		const filePath =
+			document.uri.scheme === "file" ? document.uri.fsPath : null;
+		if (filePath && fs.existsSync(filePath) && filePath.endsWith(".proto")) {
+			try {
+				await new Promise<void>((resolve, reject) => {
+					cp.execFile(
+						"buf",
+						["format", "-w", filePath],
+						{ maxBuffer: 10 * 1024 * 1024 },
+						(err) => {
+							if (err) reject(err);
+							else resolve();
+						},
+					);
+				});
+				return fs.readFileSync(filePath, "utf8");
+			} catch {
+				return null;
+			}
+		}
 		let tempPath: string | null = null;
 		try {
 			const ext = document.uri.fsPath.endsWith(".proto") ? "" : ".proto";
@@ -83,23 +102,20 @@ export class ProtoFormatProvider
 				os.tmpdir(),
 				`proto-format-${Date.now()}${ext}`,
 			);
-			fs.writeFileSync(tmpFile, text, "utf8");
+			fs.writeFileSync(tmpFile, document.getText(), "utf8");
 			tempPath = tmpFile;
-			const result = await new Promise<string>((resolve, reject) => {
+			await new Promise<void>((resolve, reject) => {
 				cp.execFile(
 					"buf",
-					["format", tmpFile],
+					["format", "-w", tmpFile],
 					{ maxBuffer: 10 * 1024 * 1024 },
-					(err, stdout, _stderr) => {
-						if (err) {
-							reject(err);
-							return;
-						}
-						resolve(stdout);
+					(err) => {
+						if (err) reject(err);
+						else resolve();
 					},
 				);
 			});
-			return result;
+			return fs.readFileSync(tmpFile, "utf8");
 		} catch {
 			return null;
 		} finally {

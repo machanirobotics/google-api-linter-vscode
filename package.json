@@ -207,9 +207,21 @@
 			{
 				"command": "googleApiLinter.revealLocation",
 				"title": "Reveal in Editor"
+			},
+			{
+				"command": "googleApiLinter.collapseAll",
+				"title": "Collapse All"
 			}
-		]
-	},
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "googleApiLinter.collapseAll",
+					"when": "view == googleApiLinter.views.proto",
+					"group": "navigation"
+				}
+			]
+		},
 	"scripts": {
 		"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
 		"compile": "tsc --noEmit && node esbuild.js",

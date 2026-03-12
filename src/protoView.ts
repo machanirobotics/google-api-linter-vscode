@@ -6,6 +6,7 @@ import {
 	type ServiceItem,
 	scanWorkspaceProto,
 } from "./protoScanner";
+import { parseMessageBody } from "./utils/protoParser";
 import {
 	findGapiConfigFile,
 	findGapiConfigFileInFolder,
@@ -48,10 +49,11 @@ export type ProtoTreeNode =
 				| "services"
 				| "resources"
 				| "mcp"
+				| "messages"
+				| "enums"
 				| "files"
 				| "deps"
 				| "rpcs"
-				| "messages"
 				| "others";
 			label: string;
 			count: number;
@@ -60,7 +62,13 @@ export type ProtoTreeNode =
 	| { kind: "dep"; name: string; commit: string }
 	| { kind: "service"; service: ServiceItem }
 	| { kind: "rpc"; rpc: RpcItem; serviceName: string }
-	| { kind: "rpcDetail"; type: "request" | "response"; typeName: string }
+	| {
+			kind: "rpcDetail";
+			type: "request" | "response";
+			typeName: string;
+			uri?: vscode.Uri;
+			range?: vscode.Range;
+	  }
 	| {
 			kind: "mcpSubsection";
 			id: "tools" | "elicitation" | "prompts";
@@ -68,6 +76,8 @@ export type ProtoTreeNode =
 			count: number;
 	  }
 	| { kind: "location"; item: LocationItem }
+	| { kind: "messageField"; label: string; type: string; uri: vscode.Uri; range: vscode.Range }
+	| { kind: "messageEnum"; label: string; uri: vscode.Uri; range: vscode.Range }
 	| { kind: "folder"; name: string; uri: vscode.Uri }
 	| { kind: "action"; command: string; label: string; icon: string };
 
@@ -95,6 +105,10 @@ export class ProtoTreeDataProvider
 		private getBinaryVersion: () => Promise<string>,
 		private getGoogleapisCommit: () => Promise<string>,
 		private getProtobufCommit: () => Promise<string>,
+		private readonly resolveTypeToLocation?: (
+			typeName: string,
+			contextUri: vscode.Uri,
+		) => Promise<vscode.Location | null>,
 	) {}
 
 	refresh(): void {
@@ -149,7 +163,7 @@ export class ProtoTreeDataProvider
 			item.description = element.commit.slice(0, 7);
 			item.iconPath = new vscode.ThemeIcon(
 				"circle-filled",
-				new vscode.ThemeColor("testing.iconPassed"),
+				new vscode.ThemeColor("terminal.ansiCyan"),
 			);
 			return item;
 		}
@@ -184,21 +198,21 @@ export class ProtoTreeDataProvider
 			item.description = hasDiag
 				? `${errorCount} error(s), ${warningCount} warning(s)`
 				: "OK";
-			// Debugger-style colors: green = OK, orange = warning, red = error
+			// Pastel colors: cyan = OK, magenta = warning, blue = error
 			if (errorCount > 0) {
 				item.iconPath = new vscode.ThemeIcon(
 					"circle-filled",
-					new vscode.ThemeColor("testing.iconFailed"),
+					new vscode.ThemeColor("terminal.ansiBlue"),
 				);
 			} else if (warningCount > 0) {
 				item.iconPath = new vscode.ThemeIcon(
 					"circle-filled",
-					new vscode.ThemeColor("editorWarning.foreground"),
+					new vscode.ThemeColor("terminal.ansiMagenta"),
 				);
 			} else {
 				item.iconPath = new vscode.ThemeIcon(
 					"circle-filled",
-					new vscode.ThemeColor("testing.iconPassed"),
+					new vscode.ThemeColor("terminal.ansiCyan"),
 				);
 			}
 			item.command = {
@@ -214,10 +228,12 @@ export class ProtoTreeDataProvider
 				vscode.TreeItemCollapsibleState.None,
 			);
 			item.description = `L${element.range.start.line + 1}`;
+			const isError = element.severity === vscode.DiagnosticSeverity.Error;
 			item.iconPath = new vscode.ThemeIcon(
-				element.severity === vscode.DiagnosticSeverity.Error
-					? "error"
-					: "warning",
+				isError ? "error" : "warning",
+				new vscode.ThemeColor(
+					isError ? "terminal.ansiBlue" : "terminal.ansiMagenta",
+				),
 			);
 			item.command = {
 				command: "googleApiLinter.revealLocation",
@@ -237,19 +253,35 @@ export class ProtoTreeDataProvider
 		if (element.kind === "section") {
 			const item = new vscode.TreeItem(
 				element.label,
-				vscode.TreeItemCollapsibleState.Expanded,
+				vscode.TreeItemCollapsibleState.Collapsed,
 			);
 			item.description = `${element.count}`;
-			item.iconPath = new vscode.ThemeIcon(element.icon);
+			const sectionColors: Record<string, string> = {
+				services: "symbolIcon.interfaceForeground",
+				resources: "symbolIcon.classForeground",
+				mcp: "symbolIcon.keywordForeground",
+				messages: "symbolIcon.classForeground",
+				enums: "symbolIcon.enumForeground",
+				deps: "terminal.ansiCyan",
+				files: "symbolIcon.fileForeground",
+				rpcs: "terminal.ansiMagenta",
+				others: "symbolIcon.variableForeground",
+			};
+			const color = sectionColors[element.id];
+			item.iconPath = new vscode.ThemeIcon(
+				element.icon,
+				color ? new vscode.ThemeColor(color) : undefined,
+			);
 			const sectionDescriptions: Record<string, string> = {
 				services: "Services with RPCs (expand to see Request/Response)",
 				resources: "Messages with google.api.resource",
 				mcp: "MCP: Tools, Elicitation, Prompts (by RPC)",
-				files: "Proto files (green=OK, orange=warning, red=error)",
-				deps: "Dependencies (googleapis, protobuf); green when downloaded",
+				files: "Proto files (cyan=OK, magenta=warning, blue=error)",
+				enums: "Enum definitions",
+				deps: "Dependencies (googleapis, protobuf); cyan when downloaded",
 				rpcs: "RPC methods in services",
-				messages: "Proto messages",
-				others: "Enums and other definitions",
+				messages: "Proto messages (expand for fields and enums)",
+				others: "Other definitions",
 			};
 			item.tooltip = sectionDescriptions[element.id] ?? element.label;
 			return item;
@@ -260,10 +292,16 @@ export class ProtoTreeDataProvider
 				vscode.TreeItemCollapsibleState.Collapsed,
 			);
 			item.description = `${element.service.rpcs.length} RPC(s)`;
-			item.iconPath = new vscode.ThemeIcon("symbol-interface");
+			item.iconPath = new vscode.ThemeIcon(
+				"symbol-interface",
+				new vscode.ThemeColor("symbolIcon.interfaceForeground"),
+			);
+			item.tooltip = new vscode.MarkdownString(
+				`Service **${element.service.name}**\n\nClick to go to definition in file.`,
+			);
 			item.command = {
 				command: "googleApiLinter.revealLocation",
-				title: "Go to",
+				title: "Go to definition",
 				arguments: [element.service.uri, element.service.range],
 			};
 			return item;
@@ -274,25 +312,50 @@ export class ProtoTreeDataProvider
 				vscode.TreeItemCollapsibleState.Collapsed,
 			);
 			item.description = element.rpc.detail;
-			item.iconPath = new vscode.ThemeIcon("symbol-method");
+			item.iconPath = new vscode.ThemeIcon(
+				"symbol-method",
+				new vscode.ThemeColor("terminal.ansiMagenta"),
+			);
 			item.command = {
 				command: "googleApiLinter.revealLocation",
 				title: "Go to",
 				arguments: [element.rpc.uri, element.rpc.range],
 			};
-			if (element.rpc.documentation) {
-				item.tooltip = new vscode.MarkdownString(element.rpc.documentation);
-			}
+			item.tooltip = new vscode.MarkdownString(
+				element.rpc.documentation
+					? `${element.rpc.documentation}\n\n\`${element.rpc.detail}\`\n\nClick to go to RPC in file.`
+					: `RPC **${element.rpc.name}**\n\n\`${element.rpc.detail}\`\n\nClick to go to definition in file.`,
+			);
 			return item;
 		}
 		if (element.kind === "rpcDetail") {
-			const item = new vscode.TreeItem(
+			const label =
 				element.type === "request"
 					? `Request: ${element.typeName}`
-					: `Response: ${element.typeName}`,
+					: `Response: ${element.typeName}`;
+			const item = new vscode.TreeItem(
+				label,
 				vscode.TreeItemCollapsibleState.None,
 			);
-			item.iconPath = new vscode.ThemeIcon("symbol-parameter");
+			item.description = element.typeName;
+			item.tooltip = new vscode.MarkdownString(
+				`${element.type === "request" ? "Request" : "Response"} message type: **${element.typeName}**\n\nClick to go to definition in file.`,
+			);
+			item.iconPath = new vscode.ThemeIcon(
+				"symbol-class",
+				new vscode.ThemeColor(
+					element.type === "request"
+						? "symbolIcon.functionForeground"
+						: "symbolIcon.methodForeground",
+				),
+			);
+			if (element.uri && element.range) {
+				item.command = {
+					command: "googleApiLinter.revealLocation",
+					title: "Go to type definition",
+					arguments: [element.uri, element.range],
+				};
+			}
 			return item;
 		}
 		if (element.kind === "mcpSubsection") {
@@ -312,12 +375,20 @@ export class ProtoTreeDataProvider
 		}
 		if (element.kind === "location") {
 			const { item: loc } = element;
+			const isMessage = loc.detail === "message";
 			const treeItem = new vscode.TreeItem(
 				loc.label,
-				vscode.TreeItemCollapsibleState.None,
+				isMessage
+					? vscode.TreeItemCollapsibleState.Collapsed
+					: vscode.TreeItemCollapsibleState.None,
 			);
 			treeItem.description = loc.detail;
-			treeItem.iconPath = new vscode.ThemeIcon(loc.icon);
+			treeItem.iconPath = new vscode.ThemeIcon(
+				loc.icon,
+				isMessage
+					? new vscode.ThemeColor("symbolIcon.classForeground")
+					: undefined,
+			);
 			treeItem.command = {
 				command: "googleApiLinter.revealLocation",
 				title: "Go to",
@@ -325,12 +396,56 @@ export class ProtoTreeDataProvider
 			};
 			if (loc.documentation || loc.detail) {
 				treeItem.tooltip = new vscode.MarkdownString(
-					loc.documentation
+					(loc.documentation
 						? `${loc.documentation}\n\n\`${loc.detail ?? ""}\``
-						: (loc.detail ?? loc.label),
+						: (loc.detail ?? loc.label)) + "\n\nClick to go to definition in file.",
+				);
+			} else {
+				treeItem.tooltip = new vscode.MarkdownString(
+					`**${loc.label}**\n\nClick to go to definition in file.`,
 				);
 			}
 			return treeItem;
+		}
+		if (element.kind === "messageField") {
+			const item = new vscode.TreeItem(
+				element.label,
+				vscode.TreeItemCollapsibleState.None,
+			);
+			item.description = element.type;
+			item.tooltip = new vscode.MarkdownString(
+				`Field **${element.label}**: \`${element.type}\`\n\nClick to go to definition in file.`,
+			);
+			item.iconPath = new vscode.ThemeIcon(
+				"symbol-field",
+				new vscode.ThemeColor("symbolIcon.fieldForeground"),
+			);
+			item.command = {
+				command: "googleApiLinter.revealLocation",
+				title: "Go to field",
+				arguments: [element.uri, element.range],
+			};
+			return item;
+		}
+		if (element.kind === "messageEnum") {
+			const item = new vscode.TreeItem(
+				element.label,
+				vscode.TreeItemCollapsibleState.None,
+			);
+			item.description = "enum";
+			item.tooltip = new vscode.MarkdownString(
+				`Enum **${element.label}**\n\nClick to go to definition in file.`,
+			);
+			item.iconPath = new vscode.ThemeIcon(
+				"symbol-enum",
+				new vscode.ThemeColor("symbolIcon.enumForeground"),
+			);
+			item.command = {
+				command: "googleApiLinter.revealLocation",
+				title: "Go to enum",
+				arguments: [element.uri, element.range],
+			};
+			return item;
 		}
 		const item = new vscode.TreeItem(
 			element.label,
@@ -415,6 +530,10 @@ export class ProtoTreeDataProvider
 					{ kind: "dep", name: "protobuf", commit: protobufCommit },
 				];
 			}
+			if (element.id === "enums")
+				return scan.others
+					.filter((o) => o.detail === "enum")
+					.map((item) => ({ kind: "location" as const, item }));
 			if (element.id === "rpcs")
 				return scan.rpcs.map((item) => ({ kind: "location" as const, item }));
 			if (element.id === "messages")
@@ -436,18 +555,67 @@ export class ProtoTreeDataProvider
 		}
 
 		if (element?.kind === "rpc") {
+			const reqType = element.rpc.requestType;
+			const resType = element.rpc.responseType;
+			const contextUri = element.rpc.uri;
+			let reqLoc: vscode.Location | null = null;
+			let resLoc: vscode.Location | null = null;
+			if (this.resolveTypeToLocation) {
+				[reqLoc, resLoc] = await Promise.all([
+					this.resolveTypeToLocation(reqType, contextUri),
+					this.resolveTypeToLocation(resType, contextUri),
+				]);
+			}
 			return [
 				{
 					kind: "rpcDetail" as const,
 					type: "request" as const,
-					typeName: element.rpc.requestType,
+					typeName: reqType,
+					uri: reqLoc?.uri,
+					range: reqLoc?.range,
 				},
 				{
 					kind: "rpcDetail" as const,
 					type: "response" as const,
-					typeName: element.rpc.responseType,
+					typeName: resType,
+					uri: resLoc?.uri,
+					range: resLoc?.range,
 				},
 			];
+		}
+
+		if (
+			element?.kind === "location" &&
+			element.item.detail === "message"
+		) {
+			try {
+				const doc = await vscode.workspace.openTextDocument(element.item.uri);
+				const { fields, enums } = parseMessageBody(
+					doc,
+					element.item.range.start.line,
+				);
+				const nodes: ProtoTreeNode[] = [];
+				for (const f of fields) {
+					nodes.push({
+						kind: "messageField",
+						label: f.name,
+						type: f.type,
+						uri: element.item.uri,
+						range: f.range,
+					});
+				}
+				for (const e of enums) {
+					nodes.push({
+						kind: "messageEnum",
+						label: e.name,
+						uri: element.item.uri,
+						range: e.range,
+					});
+				}
+				return nodes;
+			} catch {
+				return [];
+			}
 		}
 
 		if (element?.kind === "mcpSubsection") {
@@ -590,6 +758,32 @@ export class ProtoTreeDataProvider
 					icon: "symbol-interface",
 				});
 			}
+			if (scan.messages.length > 0) {
+				roots.push({
+					kind: "section",
+					id: "messages",
+					label: "Messages",
+					count: scan.messages.length,
+					icon: "symbol-class",
+				});
+			}
+			const enumsCount = scan.others.filter((o) => o.detail === "enum").length;
+			if (enumsCount > 0) {
+				roots.push({
+					kind: "section",
+					id: "enums",
+					label: "Enums",
+					count: enumsCount,
+					icon: "symbol-enum",
+				});
+			}
+			roots.push({
+				kind: "section",
+				id: "deps",
+				label: "Deps",
+				count: 2,
+				icon: "package",
+			});
 			const protoUrisForFiles = await findProtoFiles();
 			roots.push({
 				kind: "section",
@@ -597,13 +791,6 @@ export class ProtoTreeDataProvider
 				label: "Files",
 				count: protoUrisForFiles.length,
 				icon: "symbol-file",
-			});
-			roots.push({
-				kind: "section",
-				id: "deps",
-				label: "Deps",
-				count: 2,
-				icon: "package",
 			});
 
 			try {
@@ -636,12 +823,17 @@ export function registerProtoView(
 	getBinaryVersion: () => Promise<string>,
 	getGoogleapisCommit: () => Promise<string>,
 	getProtobufCommit: () => Promise<string>,
+	resolveTypeToLocation?: (
+		typeName: string,
+		contextUri: vscode.Uri,
+	) => Promise<vscode.Location | null>,
 ): void {
 	const treeDataProvider = new ProtoTreeDataProvider(
 		diagnosticCollection,
 		getBinaryVersion,
 		getGoogleapisCommit,
 		getProtobufCommit,
+		resolveTypeToLocation,
 	);
 
 	context.subscriptions.push(
@@ -653,6 +845,12 @@ export function registerProtoView(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("googleApiLinter.refreshProtoView", () => {
+			treeDataProvider.refresh();
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("googleApiLinter.collapseAll", () => {
 			treeDataProvider.refresh();
 		}),
 	);

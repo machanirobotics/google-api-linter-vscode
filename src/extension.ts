@@ -79,12 +79,13 @@ export async function activate(context: vscode.ExtensionContext) {
 			{ scheme: "file", language: "proto3" },
 			{ scheme: "file", language: "protobuf" },
 		];
+		const definitionProvider = new ProtoDefinitionProvider();
 		context.subscriptions.push(
 			diagnosticCollection,
 			outputChannel,
 			registerHoverProvider(diagnosticCollection),
 			registerSymbolHoverProvider(protoDocSelector),
-			registerDefinitionProvider(),
+			registerDefinitionProvider(definitionProvider),
 			registerReferenceProvider(protoDocSelector),
 			registerRenameProvider(protoDocSelector),
 			registerCodeActionProvider(protoDocSelector),
@@ -113,6 +114,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			() => binaryManager.getBinaryVersion(),
 			() => binaryManager.getGoogleapisCommit(),
 			() => binaryManager.getProtobufCommit(),
+			(typeName: string, contextUri: vscode.Uri) =>
+				definitionProvider.resolveTypeToLocation(typeName, contextUri),
 		);
 
 		registerStatusBar(context, diagnosticCollection);
@@ -166,8 +169,9 @@ function registerSymbolHoverProvider(
  * Registers the definition provider for go-to-definition on proto types.
  * @returns Disposable for the definition provider registration
  */
-function registerDefinitionProvider(): vscode.Disposable {
-	const definitionProvider = new ProtoDefinitionProvider();
+function registerDefinitionProvider(
+	definitionProvider: ProtoDefinitionProvider,
+): vscode.Disposable {
 	return vscode.languages.registerDefinitionProvider(
 		[
 			{ scheme: "file", language: "proto3" },

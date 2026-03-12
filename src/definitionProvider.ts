@@ -183,6 +183,37 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 	}
 
 	/**
+	 * Resolves a type name (e.g. "CreateTodoRequest" or "google.protobuf.Timestamp")
+	 * to its definition location, using the given context file for imports.
+	 */
+	public async resolveTypeToLocation(
+		typeName: string,
+		contextUri: vscode.Uri,
+	): Promise<vscode.Location | null> {
+		const simpleName = typeName.split(".").pop() ?? typeName;
+		if (typeName.startsWith("google.")) {
+			const protoFile = await this.findProtoFile(typeName);
+			if (protoFile) {
+				return await this.findDefinitionInFile(protoFile, typeName);
+			}
+			return null;
+		}
+		try {
+			const document = await vscode.workspace.openTextDocument(contextUri);
+			let loc = await this.findDefinitionInCurrentFile(document, typeName);
+			if (loc) return loc;
+			loc = await this.findDefinitionInCurrentFile(document, simpleName);
+			if (loc) return loc;
+			loc = await this.findDefinitionInImports(document, typeName);
+			if (loc) return loc;
+			loc = await this.findDefinitionInImports(document, simpleName);
+			return loc;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * Finds definition in imported files using workspace-wide search
 	 */
 	private async findDefinitionInImports(

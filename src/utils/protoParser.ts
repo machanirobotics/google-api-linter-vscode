@@ -28,6 +28,8 @@ const RE_ENUM = /^\s*enum\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\{?/;
 const RE_RPC =
 	/^\s*rpc\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(stream\s+)?([A-Za-z_.][A-Za-z0-9_.]*)\s*\)\s*returns\s*\(\s*(stream\s+)?([A-Za-z_.][A-Za-z0-9_.]*)\s*\)/;
 const RE_ONEOF = /^\s*oneof\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{?/;
+const RE_FIELD =
+	/^\s*(?:repeated|optional|required)?\s*(?:map\s*<[^>]+>\s+)?([A-Za-z_.][A-Za-z0-9_.]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+)/;
 
 function findMatchingBrace(
 	lines: string[],
@@ -211,6 +213,80 @@ function parseNestedMessages(
 		}
 		i++;
 	}
+}
+
+export interface MessageFieldInfo {
+	name: string;
+	type: string;
+	number: string;
+	range: vscode.Range;
+}
+
+export interface MessageEnumInfo {
+	name: string;
+	range: vscode.Range;
+}
+
+/**
+ * Parse a message body starting at the given line (line should be "message Name {").
+ * Returns fields and nested enums with their ranges.
+ */
+export function parseMessageBody(
+	document: vscode.TextDocument,
+	messageStartLine: number,
+): { fields: MessageFieldInfo[]; enums: MessageEnumInfo[] } {
+	const lines = document.getText().split("\n");
+	const fields: MessageFieldInfo[] = [];
+	const enums: MessageEnumInfo[] = [];
+	let startLine = messageStartLine;
+	const firstLine = lines[messageStartLine] ?? "";
+	if (!firstLine.includes("{")) {
+		for (let i = messageStartLine + 1; i < lines.length; i++) {
+			if (lines[i].includes("{")) {
+				startLine = i;
+				break;
+			}
+		}
+	}
+	const endLine = findMatchingBrace(lines, startLine, "{");
+	for (let i = startLine + 1; i < endLine; i++) {
+		const line = lines[i];
+		if (RE_COMMENT.test(line.trim())) continue;
+		const enumMatch = line.match(RE_ENUM);
+		if (enumMatch) {
+			const name = enumMatch[1];
+			const nameStart = line.indexOf(name);
+			enums.push({
+				name,
+				range: rangeFromLines(i, nameStart, i, nameStart + name.length),
+			});
+			const hasBrace = line.includes("{");
+			if (hasBrace) {
+				const closeLine = findMatchingBrace(lines, i, "{");
+				i = closeLine;
+			}
+			continue;
+		}
+		const fieldMatch = line.match(RE_FIELD);
+		if (fieldMatch) {
+			const type = fieldMatch[1];
+			const name = fieldMatch[2];
+			const number = fieldMatch[3];
+			const nameStart = line.indexOf(name);
+			fields.push({
+				name,
+				type: type ?? "?",
+				number,
+				range: rangeFromLines(
+					i,
+					nameStart,
+					i,
+					Math.min(nameStart + name.length, (lines[i] ?? "").length),
+				),
+			});
+		}
+	}
+	return { fields, enums };
 }
 
 /** Get all symbols flattened (including nested) for workspace/search. */

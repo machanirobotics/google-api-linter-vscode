@@ -19,8 +19,9 @@ jobs:
         with:
           bun-version: latest
 
+      # Use bun install (no --frozen-lockfile): repo uses package-lock.json; Bun migrates it and does not persist bun.lockb, so frozen would fail.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Biome format check (biome.json)
         run: bun run format:check

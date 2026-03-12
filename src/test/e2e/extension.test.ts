@@ -69,5 +69,59 @@ export async function run(): Promise<void> {
 		throw new Error("Expected completion provider to return at least one item");
 	}
 
-	console.log("E2E: extension activated, document symbols and completions OK");
+	// 4. Smoke test: run all extension commands (must not throw)
+	const extensionCommands = [
+		"googleApiLinter.lintCurrentFile",
+		"googleApiLinter.lintWorkspace",
+		"googleApiLinter.formatAllProtos",
+		"googleApiLinter.refreshProtoView",
+		"googleApiLinter.collapseAll",
+		"googleApiLinter.lintFileFromTree",
+		"googleApiLinter.formatFileFromTree",
+	];
+	for (const cmd of extensionCommands) {
+		try {
+			await vscode.commands.executeCommand(cmd);
+		} catch (e) {
+			throw new Error(
+				`Command ${cmd} threw: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+	}
+
+	// revealLocation needs (uri, range); call with doc we have — should not throw
+	try {
+		await vscode.commands.executeCommand(
+			"googleApiLinter.revealLocation",
+			doc.uri,
+			new vscode.Range(0, 0, 0, 0),
+		);
+	} catch (e) {
+		throw new Error(
+			`googleApiLinter.revealLocation threw: ${e instanceof Error ? e.message : String(e)}`,
+		);
+	}
+
+	// Optional/contextual commands: execute without side-effect checks (may show dialogs or no-op)
+	const optionalCommands = [
+		"googleApiLinter.createConfig",
+		"googleApiLinter.initWorkspace",
+		"googleApiLinter.restart",
+		"googleApiLinter.updateGoogleapisCommit",
+		"googleApiLinter.reinstallAll",
+	];
+	for (const cmd of optionalCommands) {
+		try {
+			await vscode.commands.executeCommand(cmd);
+		} catch (e) {
+			// Allow cancellation or expected failures (e.g. no selection, dialog cancelled)
+			console.log(
+				`Optional command ${cmd}: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+	}
+
+	console.log(
+		"E2E: extension activated, document symbols, completions, and command smoke tests OK",
+	);
 }

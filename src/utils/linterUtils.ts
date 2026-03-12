@@ -1,3 +1,4 @@
+import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -309,6 +310,99 @@ export const parseGenericOutput = (
 
 	return diagnostics;
 };
+
+/**
+ * Parses buf/protoc-style stderr (file:line:col: message) and returns diagnostics
+ * only for the given file. Paths in the output are resolved relative to cwd.
+ */
+export function parseSyntaxErrorsForFile(
+	output: string,
+	currentFileAbsolutePath: string,
+	cwd: string,
+): vscode.Diagnostic[] {
+	const diagnostics: vscode.Diagnostic[] = [];
+	const lines = output.split("\n");
+	const errorRegex =
+		/^(?:\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} )?([^:]+):(\d+):(\d+):\s*(.*)$/;
+	const normalizedCurrent = path.normalize(currentFileAbsolutePath);
+
+	for (const line of lines) {
+		const match = line.match(errorRegex);
+		if (!match) continue;
+		const filePathFromError = match[1].trim();
+		const lineStr = match[2];
+		const colStr = match[3];
+		const message = match[4].trim();
+		const resolvedPath = path.normalize(
+			path.isAbsolute(filePathFromError)
+				? filePathFromError
+				: path.join(cwd, filePathFromError),
+		);
+		if (resolvedPath !== normalizedCurrent) continue;
+
+		const lineNum = parseInt(lineStr, 10) - 1;
+		const colNum = Math.max(0, parseInt(colStr, 10) - 1);
+		const range = new vscode.Range(
+			lineNum,
+			colNum,
+			lineNum,
+			Math.max(colNum + 1, 200),
+		);
+		const diagnostic = new vscode.Diagnostic(
+			range,
+			message,
+			vscode.DiagnosticSeverity.Error,
+		);
+		diagnostic.source = "google-api-linter (syntax)";
+		diagnostics.push(diagnostic);
+	}
+	return diagnostics;
+}
+
+/**
+ * Runs `buf build` to detect proto syntax errors and returns diagnostics for the given file.
+ * Uses gapi.bufPath for the buf binary. No-op if buf is not available.
+ */
+export async function runBufSyntaxCheck(
+	fileAbsolutePath: string,
+	outputChannel?: vscode.OutputChannel,
+): Promise<vscode.Diagnostic[]> {
+	const bufPath = vscode.workspace
+		.getConfiguration("gapi")
+		.get<string>("bufPath", "buf");
+	const workspaceFolders = vscode.workspace.workspaceFolders;
+	const cwd =
+		workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(fileAbsolutePath);
+
+	return new Promise((resolve) => {
+		const child = cp.spawn(bufPath, ["build"], {
+			cwd,
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		let stderr = "";
+		child.stderr?.on("data", (data: Buffer) => {
+			stderr += data.toString();
+		});
+		child.on("error", () => resolve([]));
+		child.on("close", (code) => {
+			if (code === 0) {
+				resolve([]);
+				return;
+			}
+			const diagnostics = parseSyntaxErrorsForFile(
+				stderr,
+				fileAbsolutePath,
+				cwd,
+			);
+			if (outputChannel && diagnostics.length > 0) {
+				outputChannel.appendLine(
+					`Buf syntax check: ${diagnostics.length} error(s) in ${path.basename(fileAbsolutePath)}`,
+				);
+			}
+			resolve(diagnostics);
+		});
+	});
+}
 
 /**
  * Creates a VS Code Diagnostic from a linter problem.

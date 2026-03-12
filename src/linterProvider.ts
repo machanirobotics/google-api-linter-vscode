@@ -4,7 +4,11 @@ import { BinaryManager } from "./binaryManager";
 import type { LinterOptions } from "./types";
 import { getProtoPaths } from "./utils/configReader";
 import { findProtoFiles } from "./utils/fileUtils";
-import { buildLinterArgs, parseLinterOutput } from "./utils/linterUtils";
+import {
+	buildLinterArgs,
+	parseLinterOutput,
+	runBufSyntaxCheck,
+} from "./utils/linterUtils";
 
 /**
  * Manages linting of Protocol Buffer files using the api-linter binary.
@@ -59,6 +63,7 @@ export class ApiLinterProvider {
 			async (progress) => {
 				progress.report({ message: "Linting current file…" });
 				try {
+					progress.report({ message: "Ensuring deps…" });
 					const binaryPath = await this.binaryManager.ensureBinary();
 					this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
 
@@ -68,14 +73,17 @@ export class ApiLinterProvider {
 
 					await this.binaryManager.ensureGoogleapis();
 					await this.binaryManager.ensureProtobuf();
+					await getProtoPaths(this.outputChannel);
 
 					const options = await this.getLinterOptions();
-					const diagnostics = await this.runLinter(
-						binaryPath,
+					let diagnostics = await this.runLinter(binaryPath, filePath, options);
+					const bufSyntaxDiagnostics = await runBufSyntaxCheck(
 						filePath,
-						options,
+						this.outputChannel,
 					);
-
+					if (bufSyntaxDiagnostics.length > 0) {
+						diagnostics = [...bufSyntaxDiagnostics, ...diagnostics];
+					}
 					this.outputChannel.appendLine(
 						`Found ${diagnostics.length} diagnostic(s)`,
 					);
@@ -86,7 +94,14 @@ export class ApiLinterProvider {
 						this.outputChannel.appendLine(`Error stack: ${error.stack}`);
 					}
 					vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
-					this.diagnosticCollection.set(document.uri, []);
+					const bufSyntaxDiagnostics = await runBufSyntaxCheck(
+						filePath,
+						this.outputChannel,
+					);
+					this.diagnosticCollection.set(
+						document.uri,
+						bufSyntaxDiagnostics.length > 0 ? bufSyntaxDiagnostics : [],
+					);
 				}
 			},
 		);
@@ -171,21 +186,39 @@ export class ApiLinterProvider {
 
 		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
 		try {
+			this.outputChannel.appendLine(
+				"Ensuring deps (binary, googleapis, protobuf, buf)…",
+			);
 			const binaryPath = await this.binaryManager.ensureBinary();
 			if (!require("node:fs").existsSync(binaryPath)) {
 				throw new Error(`Binary not found at ${binaryPath} after download`);
 			}
 			await this.binaryManager.ensureGoogleapis();
 			await this.binaryManager.ensureProtobuf();
+			await getProtoPaths(this.outputChannel);
 			const options = await this.getLinterOptions();
-			const diagnostics = await this.runLinter(binaryPath, filePath, options);
+			let diagnostics = await this.runLinter(binaryPath, filePath, options);
+			const bufSyntaxDiagnostics = await runBufSyntaxCheck(
+				filePath,
+				this.outputChannel,
+			);
+			if (bufSyntaxDiagnostics.length > 0) {
+				diagnostics = [...bufSyntaxDiagnostics, ...diagnostics];
+			}
 			this.outputChannel.appendLine(
 				`Found ${diagnostics.length} diagnostic(s)`,
 			);
 			this.diagnosticCollection.set(uri, diagnostics);
 		} catch (error) {
 			this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
-			this.diagnosticCollection.set(uri, []);
+			const bufSyntaxDiagnostics = await runBufSyntaxCheck(
+				filePath,
+				this.outputChannel,
+			);
+			this.diagnosticCollection.set(
+				uri,
+				bufSyntaxDiagnostics.length > 0 ? bufSyntaxDiagnostics : [],
+			);
 		}
 	}
 

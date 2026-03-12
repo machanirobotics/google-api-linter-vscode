@@ -54,29 +54,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		linterProvider = new ApiLinterProvider(diagnosticCollection, outputChannel);
 
-		// Log startup message to output channel with version info
-		outputChannel.appendLine("=".repeat(60));
-		outputChannel.appendLine(`${EXTENSION_NAME} Extension Activated`);
-		outputChannel.appendLine(`Extension Version: 1.1.2`);
-		outputChannel.appendLine(`Timestamp: ${new Date().toISOString()}`);
-
-		// Get binary manager to fetch versions
-		const binaryManager = (linterProvider as any).binaryManager;
-		const binaryVersion = await binaryManager.getBinaryVersion();
-		const googleapisCommit = await binaryManager.getGoogleapisCommit();
-		const protobufCommit = await binaryManager.getProtobufCommit();
-
-		outputChannel.appendLine(`API Linter Version: ${binaryVersion}`);
-		outputChannel.appendLine(`googleapis Commit: ${googleapisCommit}`);
-		outputChannel.appendLine(`protobuf Commit: ${protobufCommit}`);
-		outputChannel.appendLine("=".repeat(60));
-		outputChannel.appendLine("");
-		outputChannel.show(true); // Show the output channel
-
-		vscode.window.showInformationMessage(
-			`${EXTENSION_NAME} activated! Check Output panel.`,
-		);
-
 		const protoDocSelector = [
 			{ scheme: "file", language: "proto3" },
 			{ scheme: "file", language: "protobuf" },

@@ -215,7 +215,8 @@
 			},
 			{
 				"command": "googleApiLinter.collapseAll",
-				"title": "Collapse All"
+				"title": "Collapse All",
+				"icon": "$(collapse-all)"
 			},
 			{
 				"command": "googleApiLinter.lintFileFromTree",
@@ -250,7 +251,7 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "tsc --noEmit && node esbuild.js --production",
-		"compile": "tsc --noEmit && node esbuild.js",
+		"compile": "tsc && node esbuild.js",
 		"build": "bun run compile",
 		"typecheck": "tsc --noEmit",
 		"watch": "tsc -watch -p ./",

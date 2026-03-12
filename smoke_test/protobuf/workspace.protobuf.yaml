@@ -1,1 +1,5 @@
-# WORKSPACE for API_LINTER
+# Proto workspace config (Google API Linter)
+# See: https://github.com/machanirobotics/google-api-linter-vscode
+
+# Optional: list of directories containing .proto files (default: this directory)
+# proto_path: .

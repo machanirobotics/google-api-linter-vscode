@@ -491,29 +491,26 @@ export class ProtoTreeDataProvider
 					item,
 				}));
 			if (element.id === "mcp") {
-				const nodes: ProtoTreeNode[] = [];
-				if (scan.mcpTools.length > 0)
-					nodes.push({
+				return [
+					{
 						kind: "mcpSubsection",
 						id: "tools",
 						label: "Tools",
 						count: scan.mcpTools.length,
-					});
-				if (scan.mcpElicitation.length > 0)
-					nodes.push({
+					},
+					{
 						kind: "mcpSubsection",
 						id: "elicitation",
 						label: "Elicitation",
 						count: scan.mcpElicitation.length,
-					});
-				if (scan.mcpPrompts.length > 0)
-					nodes.push({
+					},
+					{
 						kind: "mcpSubsection",
 						id: "prompts",
 						label: "Prompts",
 						count: scan.mcpPrompts.length,
-					});
-				return nodes;
+					},
+				];
 			}
 			if (element.id === "files") {
 				const protoUris = await findProtoFiles();
@@ -858,11 +855,12 @@ export function registerProtoView(
 		resolveTypeToLocation,
 	);
 
+	// createTreeView registers the built-in collapseAll command (workbench.actions.treeView.<id>.collapseAll)
 	context.subscriptions.push(
-		vscode.window.registerTreeDataProvider(
-			"googleApiLinter.views.proto",
+		vscode.window.createTreeView("googleApiLinter.views.proto", {
 			treeDataProvider,
-		),
+			showCollapseAll: false, // we contribute our own icon button
+		}),
 	);
 
 	context.subscriptions.push(
@@ -872,8 +870,15 @@ export function registerProtoView(
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("googleApiLinter.collapseAll", () => {
-			treeDataProvider.refresh();
+		vscode.commands.registerCommand("googleApiLinter.collapseAll", async () => {
+			try {
+				await vscode.commands.executeCommand(
+					"workbench.actions.treeView.googleApiLinter.views.proto.collapseAll",
+				);
+			} catch {
+				// Built-in command only exists when view is created with createTreeView; fallback refresh
+				treeDataProvider.refresh();
+			}
 		}),
 	);
 

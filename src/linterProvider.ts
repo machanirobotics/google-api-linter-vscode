@@ -34,6 +34,11 @@ export class ApiLinterProvider {
 		this.binaryManager = new BinaryManager(outputChannel);
 	}
 
+	/** Exposes the binary manager for extension commands (reinstall, proto view). */
+	public getBinaryManager(): BinaryManager {
+		return this.binaryManager;
+	}
+
 	/**
 	 * Lints a single document and updates diagnostics.
 	 * @param document - The document to lint

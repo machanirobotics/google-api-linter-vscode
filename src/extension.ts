@@ -53,6 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
 
 		linterProvider = new ApiLinterProvider(diagnosticCollection, outputChannel);
+		const binaryManager = linterProvider.getBinaryManager();
 
 		const protoDocSelector = [
 			{ scheme: "file", language: "proto3" },

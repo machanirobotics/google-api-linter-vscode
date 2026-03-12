@@ -351,7 +351,8 @@ function registerDocumentListeners(
 					}
 
 					const timeout = setTimeout(async () => {
-						await linterProvider.lintDocument(event.document, true);
+						// Don't save: avoids triggering format-on-save and overwriting the buffer
+						await linterProvider.lintDocument(event.document, false);
 						timeouts.delete(uri);
 					}, 1000);
 

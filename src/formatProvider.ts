@@ -77,30 +77,10 @@ export class ProtoFormatProvider
 		});
 	}
 
+	/** Always format from document content (temp file) so we never overwrite buffer with stale disk content. */
 	private async formatWithBuf(
 		document: vscode.TextDocument,
 	): Promise<string | null> {
-		const filePath =
-			document.uri.scheme === "file" ? document.uri.fsPath : null;
-		if (filePath && fs.existsSync(filePath) && filePath.endsWith(".proto")) {
-			try {
-				const buf = this.getBufPath();
-				await new Promise<void>((resolve, reject) => {
-					cp.execFile(
-						buf,
-						["format", "-w", filePath],
-						{ maxBuffer: 10 * 1024 * 1024 },
-						(err) => {
-							if (err) reject(err);
-							else resolve();
-						},
-					);
-				});
-				return fs.readFileSync(filePath, "utf8");
-			} catch {
-				return null;
-			}
-		}
 		let tempPath: string | null = null;
 		try {
 			const ext = document.uri.fsPath.endsWith(".proto") ? "" : ".proto";

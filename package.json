@@ -287,7 +287,7 @@
 		"esbuild": "^0.27.3",
 		"eslint": "^10.0.3",
 		"typedoc": "^0.28.17",
-		"typescript": "^5.9.3",
+		"typescript": "^6.0.2",
 		"vscode-languageserver": "^9.0.1",
 		"vscode-languageserver-textdocument": "^1.0.12"
 	}

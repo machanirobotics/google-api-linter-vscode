@@ -60,6 +60,20 @@ export class DownloadManager {
 	}
 
 	/**
+	 * Gets the googleapis directory path
+	 */
+	public getGoogleapisDir(): string {
+		return this.googleapisDownloader.getGoogleapisDir();
+	}
+
+	/**
+	 * Gets the protobuf directory path
+	 */
+	public getProtobufDir(): string {
+		return this.protobufDownloader.getProtobufDir();
+	}
+
+	/**
 	 * Checks for api-linter updates
 	 */
 	public async checkAndUpdate(): Promise<void> {

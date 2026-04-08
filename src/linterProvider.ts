@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import * as path from "node:path";
 import * as vscode from "vscode";
 import { BinaryManager } from "./binaryManager";
 import type { LinterOptions } from "./types";
@@ -123,6 +124,17 @@ export class ApiLinterProvider {
 
 		// Merge config file paths with user settings
 		const allProtoPaths = [...configProtoPaths, ...userProtoPaths];
+
+		// Include system paths (googleapis and protobuf) from BinaryManager
+		const googleapisDir = this.binaryManager.getGoogleapisDir();
+		const protobufDir = this.binaryManager.getProtobufDir();
+
+		if (require("node:fs").existsSync(googleapisDir)) {
+			allProtoPaths.push(googleapisDir);
+		}
+		if (require("node:fs").existsSync(protobufDir)) {
+			allProtoPaths.push(protobufDir);
+		}
 
 		const options = {
 			configPath: config.get<string>("configPath"),

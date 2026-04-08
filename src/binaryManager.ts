@@ -39,4 +39,12 @@ export class BinaryManager {
 	public async checkAndUpdate(): Promise<void> {
 		return this.downloadManager.checkAndUpdate();
 	}
+
+	public getGoogleapisDir(): string {
+		return this.downloadManager.getGoogleapisDir();
+	}
+
+	public getProtobufDir(): string {
+		return this.downloadManager.getProtobufDir();
+	}
 }

@@ -143,14 +143,12 @@ export async function scanWorkspaceProto(
 							});
 						}
 					}
-					if (rpcItems.length > 0) {
-						services.push({
-							name: s.name,
-							uri,
-							range: s.selectionRange,
-							rpcs: rpcItems,
-						});
-					}
+					services.push({
+						name: s.name,
+						uri,
+						range: s.selectionRange,
+						rpcs: rpcItems,
+					});
 				}
 			}
 			for (const s of flat) {
@@ -214,15 +212,20 @@ export async function scanWorkspaceProto(
 			const getLastRpcBefore = (line: number): string | undefined => {
 				let last: string | undefined;
 				for (const { line: L, rpcName } of rpcLines) {
-					if (L < line) last = rpcName;
-					else break;
+					if (L < line) {
+						last = rpcName;
+					} else {
+						break;
+					}
 				}
 				return last;
 			};
 
 			for (let i = 0; i < lines.length; i++) {
 				const line = lines[i];
-				if (RE_COMMENT.test(line.trim())) continue;
+				if (RE_COMMENT.test(line.trim())) {
+					continue;
+				}
 
 				if (RE_OPTION_MCP_SERVICE.test(line)) {
 					const serviceMatch =

@@ -16,26 +16,47 @@ export class ProtoDocumentLinkProvider implements vscode.DocumentLinkProvider {
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
 		for (let i = 0; i < document.lineCount; i++) {
-			if (token.isCancellationRequested) break;
+			if (token.isCancellationRequested) {
+				break;
+			}
 			const line = document.lineAt(i);
 			const match = line.text.match(RE_IMPORT);
-			if (!match) continue;
-
-			const importPath = match[1];
-			const startQuote = line.text.indexOf('"', line.text.indexOf("import"));
-			const endQuote = line.text.indexOf('"', startQuote + 1);
-			if (startQuote === -1) {
-				const singleStart = line.text.indexOf("'");
-				const singleEnd = line.text.indexOf("'", singleStart + 1);
-				if (singleStart === -1) continue;
-				const range = new vscode.Range(i, singleStart + 1, i, singleEnd);
-				const target = this.resolveImport(importPath, docDir, workspaceRoot);
-				if (target) links.push(new vscode.DocumentLink(range, target));
+			if (!match) {
 				continue;
 			}
-			const range = new vscode.Range(i, startQuote + 1, i, endQuote);
-			const target = this.resolveImport(importPath, docDir, workspaceRoot);
-			if (target) links.push(new vscode.DocumentLink(range, target));
+
+			const importPath = match[1];
+			const importKeywordIdx = line.text.indexOf("import");
+			if (importKeywordIdx === -1) {
+				continue;
+			}
+
+			// Try double-quoted import first
+			const dqStart = line.text.indexOf('"', importKeywordIdx);
+			if (dqStart !== -1) {
+				const dqEnd = line.text.indexOf('"', dqStart + 1);
+				if (dqEnd !== -1) {
+					const range = new vscode.Range(i, dqStart + 1, i, dqEnd);
+					const target = this.resolveImport(importPath, docDir, workspaceRoot);
+					if (target) {
+						links.push(new vscode.DocumentLink(range, target));
+					}
+					continue;
+				}
+			}
+
+			// Fallback: single-quoted import
+			const sqStart = line.text.indexOf("'", importKeywordIdx);
+			if (sqStart !== -1) {
+				const sqEnd = line.text.indexOf("'", sqStart + 1);
+				if (sqEnd !== -1) {
+					const range = new vscode.Range(i, sqStart + 1, i, sqEnd);
+					const target = this.resolveImport(importPath, docDir, workspaceRoot);
+					if (target) {
+						links.push(new vscode.DocumentLink(range, target));
+					}
+				}
+			}
 		}
 		return links;
 	}

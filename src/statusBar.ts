@@ -14,16 +14,22 @@ export function registerStatusBar(
 	context.subscriptions.push(statusBarItem);
 
 	const update = () => {
-		if (!statusBarItem) return;
+		if (!statusBarItem) {
+			return;
+		}
 		const all = vscode.languages.getDiagnostics();
 		let errorCount = 0;
 		let warningCount = 0;
 		for (const [, diags] of all) {
 			for (const d of diags) {
-				if (d.source !== DIAGNOSTIC_SOURCE) continue;
-				if (d.severity === vscode.DiagnosticSeverity.Error) errorCount++;
-				else if (d.severity === vscode.DiagnosticSeverity.Warning)
+				if (d.source !== DIAGNOSTIC_SOURCE) {
+					continue;
+				}
+				if (d.severity === vscode.DiagnosticSeverity.Error) {
+					errorCount++;
+				} else if (d.severity === vscode.DiagnosticSeverity.Warning) {
 					warningCount++;
+				}
 			}
 		}
 		const total = errorCount + warningCount;

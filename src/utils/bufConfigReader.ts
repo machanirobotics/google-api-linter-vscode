@@ -25,14 +25,18 @@ export async function findBufConfig(): Promise<vscode.Uri | null> {
 		"**/node_modules/**",
 		10,
 	);
-	if (files.length === 0) return null;
+	if (files.length === 0) {
+		return null;
+	}
 	// Prefer workspace root, then shortest path
 	const roots =
 		vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? [];
 	const atRoot = files.find((u) =>
 		roots.some((r) => u.fsPath === path.join(r, "buf.yaml")),
 	);
-	if (atRoot) return atRoot;
+	if (atRoot) {
+		return atRoot;
+	}
 	const sorted = files.sort((a, b) => a.fsPath.length - b.fsPath.length);
 	return sorted[0];
 }
@@ -50,7 +54,9 @@ export function readBufConfig(content: string): BufConfig {
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		const trimmed = line.trim();
-		if (trimmed.startsWith("#") || trimmed === "") continue;
+		if (trimmed.startsWith("#") || trimmed === "") {
+			continue;
+		}
 
 		const versionMatch = trimmed.match(/^version:\s*["']?([^"'\s]+)["']?/);
 		if (versionMatch) {
@@ -70,7 +76,13 @@ export function readBufConfig(content: string): BufConfig {
 			inModules = false;
 			continue;
 		}
-		if (trimmed.startsWith("breaking:") || /^\w+:\s*$/.test(trimmed)) {
+		// Only reset section tracking on top-level (unindented) keys that aren't
+		// sub-fields of modules (e.g. `path:` and `name:` are module sub-fields).
+		const isTopLevel = line.length > 0 && line[0] !== " " && line[0] !== "\t";
+		if (
+			isTopLevel &&
+			(trimmed.startsWith("breaking:") || /^\w+:[^\S]*(#.*)?$/.test(trimmed))
+		) {
 			inModules = false;
 			inDeps = false;
 			continue;
@@ -88,7 +100,9 @@ export function readBufConfig(content: string): BufConfig {
 				}
 				currentModule = { path: pathMatch[1].trim() };
 			}
-			if (nameMatch) currentModule.name = nameMatch[1].trim();
+			if (nameMatch) {
+				currentModule.name = nameMatch[1].trim();
+			}
 			if (
 				currentModule.path !== undefined &&
 				currentModule.name !== undefined
@@ -102,7 +116,9 @@ export function readBufConfig(content: string): BufConfig {
 		}
 		if (inDeps) {
 			const depMatch = trimmed.match(/^-\s*["']?([^"'\n]+)["']?/);
-			if (depMatch) config.deps.push(depMatch[1].trim());
+			if (depMatch) {
+				config.deps.push(depMatch[1].trim());
+			}
 		}
 	}
 	if (currentModule.path !== undefined) {
@@ -132,8 +148,9 @@ function runBufExport(
 				...spawnOpts,
 				encoding: "utf8",
 			});
-			if (dm.status !== 0 && dm.stderr)
+			if (dm.status !== 0 && dm.stderr) {
 				log(`buf mod download: ${dm.stderr.trim()}`);
+			}
 		} catch (e) {
 			log(
 				"buf mod download failed (non-fatal): " +
@@ -145,22 +162,54 @@ function runBufExport(
 			encoding: "utf8",
 		});
 		if (ex.status !== 0) {
-			if (ex.stderr) log(`buf export: ${ex.stderr.trim()}`);
+			if (ex.stderr) {
+				log(`buf export: ${ex.stderr.trim()}`);
+			}
 			throw new Error(ex.stderr || "buf export failed");
 		}
-		if (!fs.existsSync(tmpDir)) return null;
+		if (!fs.existsSync(tmpDir)) {
+			return null;
+		}
 		return tmpDir;
 	} catch (e) {
 		log(`buf export failed: ${e instanceof Error ? e.message : String(e)}`);
 		try {
-			if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true });
+			if (fs.existsSync(tmpDir)) {
+				fs.rmSync(tmpDir, { recursive: true });
+			}
 		} catch {}
 		return null;
 	}
 }
 
 const BUF_CACHE_MS = 5 * 60 * 1000; // 5 minutes
-let bufPathsCache: { key: string; paths: string[]; at: number } | null = null;
+let bufPathsCache: {
+	key: string;
+	paths: string[];
+	at: number;
+	tmpDir?: string;
+} | null = null;
+
+/** Clean up a previously exported tmp directory if it still exists. */
+export function cleanupPreviousTmpDir(tmpDir: string | undefined): void {
+	if (!tmpDir) {
+		return;
+	}
+	try {
+		if (fs.existsSync(tmpDir)) {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
+	} catch (e) {
+		console.error(`[buf] Failed to cleanup tmp dir ${tmpDir}:`, e);
+	}
+}
+
+/** Clean up all current buf export temp directories (called during deactivation). */
+export function cleanupAllBufTmpDirs(): void {
+	if (bufPathsCache?.tmpDir) {
+		cleanupPreviousTmpDir(bufPathsCache.tmpDir);
+	}
+}
 
 function getBufCacheKey(bufYamlPath: string): string {
 	try {
@@ -182,7 +231,9 @@ export async function getBufProtoPaths(outputChannel?: {
 	appendLine: (s: string) => void;
 }): Promise<string[]> {
 	const bufUri = await findBufConfig();
-	if (!bufUri) return [];
+	if (!bufUri) {
+		return [];
+	}
 	const bufYamlDir = path.dirname(bufUri.fsPath);
 	const cacheKey = getBufCacheKey(bufUri.fsPath);
 	if (
@@ -203,19 +254,34 @@ export async function getBufProtoPaths(outputChannel?: {
 	const config = readBufConfig(content);
 	const paths: string[] = [];
 
+	// Purge the previous export tmp dir before creating a new one to prevent accumulation
+	if (bufPathsCache?.tmpDir) {
+		cleanupPreviousTmpDir(bufPathsCache.tmpDir);
+	}
+
 	// Buf export pulls in the module and all deps into one tree (so imports resolve)
 	const exportDir = runBufExport(bufYamlDir, outputChannel);
-	if (exportDir) paths.push(exportDir);
+	if (exportDir) {
+		paths.push(exportDir);
+	}
 
 	// Local module paths (e.g. path: protobuf) relative to buf.yaml
 	for (const mod of config.modules) {
 		const resolved = path.resolve(bufYamlDir, mod.path);
-		if (fs.existsSync(resolved) && !paths.includes(resolved))
+		if (fs.existsSync(resolved) && !paths.includes(resolved)) {
 			paths.push(resolved);
+		}
 	}
 
-	if (!paths.includes(bufYamlDir)) paths.push(bufYamlDir);
+	if (!paths.includes(bufYamlDir)) {
+		paths.push(bufYamlDir);
+	}
 
-	bufPathsCache = { key: cacheKey, paths, at: Date.now() };
+	bufPathsCache = {
+		key: cacheKey,
+		paths,
+		at: Date.now(),
+		tmpDir: exportDir ?? undefined,
+	};
 	return paths;
 }

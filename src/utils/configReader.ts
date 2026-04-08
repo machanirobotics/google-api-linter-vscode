@@ -47,21 +47,62 @@ export async function readGapiConfig(
 		const content = await vscode.workspace.fs.readFile(configUri);
 		const text = Buffer.from(content).toString("utf8");
 
-		// Simple YAML parsing for proto_path
+		// Simple YAML parsing for proto_path / proto_paths
 		const lines = text.split("\n");
 		const protoPaths: string[] = [];
 		const configDir = path.dirname(configUri.fsPath);
+		let inProtoPathsList = false;
 
 		for (const line of lines) {
 			const trimmed = line.trim();
 
-			// Match proto_path: "path" or proto_path: path
-			const match = trimmed.match(/^proto_path:\s*["']?([^"'\n]+)["']?/);
-			if (match) {
-				const protoPath = match[1].trim();
-				// Resolve relative to config file location
-				const absolutePath = path.resolve(configDir, protoPath);
-				protoPaths.push(absolutePath);
+			// Detect start of a proto_paths list block
+			if (/^proto_paths\s*:/.test(trimmed)) {
+				inProtoPathsList = true;
+				// Check for inline value: proto_paths: some/path
+				const inlineMatch = trimmed.match(
+					/^proto_paths\s*:\s*["']?([^"'\n#]+)["']?/,
+				);
+				if (inlineMatch && inlineMatch[1].trim()) {
+					const p = inlineMatch[1].trim();
+					protoPaths.push(path.resolve(configDir, p));
+				}
+				continue;
+			}
+
+			// Scalar form: proto_path: some/path
+			const scalarMatch = trimmed.match(
+				/^proto_path\s*:\s*["']?([^"'\n#]+)["']?/,
+			);
+			if (scalarMatch) {
+				inProtoPathsList = false;
+				const p = scalarMatch[1].trim();
+				protoPaths.push(path.resolve(configDir, p));
+				continue;
+			}
+
+			// List item inside proto_paths block: - some/path
+			if (inProtoPathsList && trimmed.startsWith("-")) {
+				const listItem = trimmed
+					.replace(/^-\s*/, "")
+					.replace(/["']/g, "")
+					.trim();
+				if (listItem) {
+					protoPaths.push(path.resolve(configDir, listItem));
+				}
+				continue;
+			}
+
+			// Any non-indented, non-list-item line that has a key resets list mode
+			if (
+				inProtoPathsList &&
+				line.length > 0 &&
+				line[0] !== " " &&
+				line[0] !== "\t" &&
+				!trimmed.startsWith("-") &&
+				!trimmed.startsWith("#")
+			) {
+				inProtoPathsList = false;
 			}
 		}
 
@@ -114,7 +155,9 @@ export async function getProtoPaths(outputChannel?: {
 
 	if (allPaths.length === 0) {
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-		if (workspaceRoot) allPaths.push(workspaceRoot);
+		if (workspaceRoot) {
+			allPaths.push(workspaceRoot);
+		}
 	}
 
 	return allPaths;

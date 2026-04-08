@@ -97,7 +97,9 @@ export const createFormatFileFromTreeCommand = () => {
 				"uri" in element
 			) {
 				const uri = (element as { uri: vscode.Uri }).uri;
-				if (!uri || !uri.fsPath.endsWith(".proto")) return;
+				if (!uri || !uri.fsPath.endsWith(".proto")) {
+					return;
+				}
 				const filePath = uri.fsPath;
 				try {
 					const bufPath = vscode.workspace
@@ -109,15 +111,20 @@ export const createFormatFileFromTreeCommand = () => {
 							["format", "-w", filePath],
 							{ maxBuffer: 10 * 1024 * 1024 },
 							(err) => {
-								if (err) reject(err);
-								else resolve();
+								if (err) {
+									reject(err);
+								} else {
+									resolve();
+								}
 							},
 						);
 					});
 					const doc = vscode.workspace.textDocuments.find(
 						(d) => d.uri.toString() === uri.toString(),
 					);
-					if (doc) await doc.save();
+					if (doc) {
+						await doc.save();
+					}
 					vscode.window.showInformationMessage(
 						`Formatted ${vscode.workspace.asRelativePath(uri)}`,
 					);
@@ -168,8 +175,11 @@ export const createFormatAllProtosCommand = () => {
 									["format", "-w", filePath],
 									{ maxBuffer: 10 * 1024 * 1024 },
 									(err) => {
-										if (err) reject(err);
-										else resolve();
+										if (err) {
+											reject(err);
+										} else {
+											resolve();
+										}
 									},
 								);
 							});
@@ -177,7 +187,9 @@ export const createFormatAllProtosCommand = () => {
 							const doc = vscode.workspace.textDocuments.find(
 								(d) => d.uri.toString() === uri.toString(),
 							);
-							if (doc) await doc.save();
+							if (doc) {
+								await doc.save();
+							}
 						} catch {
 							// skip failed file
 						}

@@ -11,6 +11,11 @@ export class DownloadManager {
 	private googleapisDownloader: GoogleapisDownloader;
 	private protobufDownloader: ProtobufDownloader;
 
+	// Session-level cache flags to avoid repeated disk checks
+	private binaryEnsured = false;
+	private googleapisEnsured = false;
+	private protobufEnsured = false;
+
 	constructor(outputChannel: vscode.OutputChannel) {
 		this.apiLinterDownloader = new ApiLinterDownloader(outputChannel);
 		this.googleapisDownloader = new GoogleapisDownloader(outputChannel);
@@ -20,22 +25,35 @@ export class DownloadManager {
 	/**
 	 * Ensures the api-linter binary is available
 	 */
-	public async ensureBinary(): Promise<string> {
-		return this.apiLinterDownloader.ensureBinary();
+	public async ensureBinary(force = false): Promise<string> {
+		if (!force && this.binaryEnsured) {
+			return this.apiLinterDownloader.ensureBinary(); // Still call it, but it should be fast
+		}
+		const path = await this.apiLinterDownloader.ensureBinary();
+		this.binaryEnsured = true;
+		return path;
 	}
 
 	/**
 	 * Ensures googleapis protos are downloaded
 	 */
-	public async ensureGoogleapis(): Promise<void> {
-		return this.googleapisDownloader.ensureGoogleapis();
+	public async ensureGoogleapis(force = false): Promise<void> {
+		if (!force && this.googleapisEnsured) {
+			return;
+		}
+		await this.googleapisDownloader.ensureGoogleapis();
+		this.googleapisEnsured = true;
 	}
 
 	/**
 	 * Ensures protobuf protos are downloaded
 	 */
-	public async ensureProtobuf(): Promise<void> {
-		return this.protobufDownloader.ensureProtobuf();
+	public async ensureProtobuf(force = false): Promise<void> {
+		if (!force && this.protobufEnsured) {
+			return;
+		}
+		await this.protobufDownloader.ensureProtobuf();
+		this.protobufEnsured = true;
 	}
 
 	/**

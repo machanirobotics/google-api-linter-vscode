@@ -20,6 +20,7 @@ export class ApiLinterProvider {
 	private outputChannel: vscode.OutputChannel;
 	private binaryManager: BinaryManager;
 	private workspaceLintInProgress = false;
+	private activeLintUris = new Set<string>();
 
 	/**
 	 * Creates a new linter provider.
@@ -44,10 +45,12 @@ export class ApiLinterProvider {
 	 * Lints a single document and updates diagnostics.
 	 * @param document - The document to lint
 	 * @param saveFirst - Whether to save the document before linting (for unsaved changes)
+	 * @param silent - If true, runs the lint without showing a progress notification
 	 */
 	public async lintDocument(
 		document: vscode.TextDocument,
 		saveFirst: boolean = false,
+		silent: boolean = false,
 	): Promise<void> {
 		if (!document.fileName.endsWith(".proto")) {
 			return;
@@ -58,57 +61,87 @@ export class ApiLinterProvider {
 		}
 
 		const filePath = document.uri.fsPath;
-		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
+		const uriStr = document.uri.toString();
 
-		await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: "Google API Linter",
-				cancellable: false,
-			},
-			async (progress) => {
-				progress.report({ message: "Linting current file…" });
-				try {
-					progress.report({ message: "Ensuring deps…" });
-					const binaryPath = await this.binaryManager.ensureBinary();
-					this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
+		if (this.activeLintUris.has(uriStr)) {
+			return;
+		}
 
-					if (!require("node:fs").existsSync(binaryPath)) {
-						throw new Error(`Binary not found at ${binaryPath} after download`);
-					}
-
-					await this.binaryManager.ensureGoogleapis();
-					await this.binaryManager.ensureProtobuf();
-					const options = await this.getLinterOptions();
-					let diagnostics = await this.runLinter(binaryPath, filePath, options);
-					const bufSyntaxDiagnostics = await runBufSyntaxCheck(
-						filePath,
-						this.outputChannel,
-					);
-					if (bufSyntaxDiagnostics.length > 0) {
-						diagnostics = [...bufSyntaxDiagnostics, ...diagnostics];
-					}
-					this.outputChannel.appendLine(
-						`Found ${diagnostics.length} diagnostic(s)`,
-					);
-					this.diagnosticCollection.set(document.uri, diagnostics);
-				} catch (error) {
-					this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
-					if (error instanceof Error) {
-						this.outputChannel.appendLine(`Error stack: ${error.stack}`);
-					}
-					vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
-					const bufSyntaxDiagnostics = await runBufSyntaxCheck(
-						filePath,
-						this.outputChannel,
-					);
-					this.diagnosticCollection.set(
-						document.uri,
-						bufSyntaxDiagnostics.length > 0 ? bufSyntaxDiagnostics : [],
-					);
-				}
-			},
+		this.activeLintUris.add(uriStr);
+		this.outputChannel.appendLine(
+			`Starting lint for: ${filePath} (silent: ${silent})`,
 		);
+
+		const runLint = async (
+			progress?: vscode.Progress<{ message?: string }>,
+		) => {
+			try {
+				if (progress) progress.report({ message: "Ensuring deps…" });
+				const binaryPath = await this.binaryManager.ensureBinary();
+				this.outputChannel.appendLine(`Using binary: ${binaryPath}`);
+
+				if (!require("node:fs").existsSync(binaryPath)) {
+					throw new Error(`Binary not found at ${binaryPath} after download`);
+				}
+
+				await this.binaryManager.ensureGoogleapis();
+				await this.binaryManager.ensureProtobuf();
+
+				const options = await this.getLinterOptions();
+				let diagnostics = await this.runLinter(binaryPath, filePath, options);
+
+				const bufSyntaxDiagnostics = await runBufSyntaxCheck(
+					filePath,
+					this.outputChannel,
+				);
+				if (bufSyntaxDiagnostics.length > 0) {
+					diagnostics = [...bufSyntaxDiagnostics, ...diagnostics];
+				}
+
+				this.outputChannel.appendLine(
+					`Found ${diagnostics.length} diagnostic(s)`,
+				);
+				this.diagnosticCollection.set(document.uri, diagnostics);
+			} catch (error) {
+				this.outputChannel.appendLine(`Error linting ${filePath}: ${error}`);
+				if (error instanceof Error) {
+					this.outputChannel.appendLine(`Error stack: ${error.stack}`);
+				}
+				if (!silent) {
+					vscode.window.showErrorMessage(`Google API Linter error: ${error}`);
+				}
+
+				// Fallback to buf syntax check even if linter failed
+				const bufSyntaxDiagnostics = await runBufSyntaxCheck(
+					filePath,
+					this.outputChannel,
+				);
+				this.diagnosticCollection.set(
+					document.uri,
+					bufSyntaxDiagnostics.length > 0 ? bufSyntaxDiagnostics : [],
+				);
+			}
+		};
+
+		try {
+			if (silent) {
+				await runLint();
+			} else {
+				await vscode.window.withProgress(
+					{
+						location: vscode.ProgressLocation.Notification,
+						title: "Google API Linter",
+						cancellable: false,
+					},
+					async (progress) => {
+						progress.report({ message: "Linting current file…" });
+						await runLint(progress);
+					},
+				);
+			}
+		} finally {
+			this.activeLintUris.delete(uriStr);
+		}
 	}
 
 	/**
@@ -355,7 +388,6 @@ export class ApiLinterProvider {
 				}
 
 				// Only reject if we failed and found no diagnostics
-				// We allow other exit codes if we successfully parsed syntax errors
 				if (diagnostics.length === 0 && code !== 0 && code !== 1) {
 					this.outputChannel.appendLine(`api-linter exited with code ${code}`);
 					this.outputChannel.appendLine(`stdout: ${stdout}`);

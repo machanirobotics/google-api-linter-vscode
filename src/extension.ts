@@ -321,7 +321,7 @@ function registerDocumentListeners(
 	disposables.push(
 		vscode.workspace.onDidOpenTextDocument((doc) => {
 			if (isProtoFile(doc.fileName)) {
-				linterProvider.lintDocument(doc);
+				linterProvider.lintDocument(doc, false, true);
 			}
 		}),
 	);
@@ -346,7 +346,7 @@ function registerDocumentListeners(
 	// Initial lint if an editor is already active
 	const activeEditor = vscode.window.activeTextEditor;
 	if (activeEditor && isProtoFile(activeEditor.document.fileName)) {
-		linterProvider.lintDocument(activeEditor.document);
+		linterProvider.lintDocument(activeEditor.document, false, true);
 	}
 
 	return vscode.Disposable.from(...disposables);

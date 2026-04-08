@@ -87,13 +87,24 @@ export class ProtoFormatProvider
 	): Promise<string | null> {
 		let tempPath: string | null = null;
 		try {
+			// Find the directory of the current file. Creating the temp file in the same directory
+			// ensures that 'buf' can find the local 'buf.yaml' or project config.
+			const fileDir = path.dirname(document.uri.fsPath);
+
+			// Ensure the directory exists (it should, as it's an open file)
+			if (!fs.existsSync(fileDir)) {
+				return null;
+			}
+
 			const ext = document.uri.fsPath.endsWith(".proto") ? "" : ".proto";
 			const tmpFile = path.join(
-				os.tmpdir(),
-				`proto-format-${Date.now()}${ext}`,
+				fileDir,
+				`.gapi-format-temp-${Date.now()}${ext}`,
 			);
+
 			fs.writeFileSync(tmpFile, document.getText(), "utf8");
 			tempPath = tmpFile;
+
 			const buf = this.getBufPath();
 			await new Promise<void>((resolve, reject) => {
 				cp.execFile(

@@ -60,7 +60,9 @@ export async function readGapiConfig(
 			if (/^proto_paths\s*:/.test(trimmed)) {
 				inProtoPathsList = true;
 				// Check for inline value: proto_paths: some/path
-				const inlineMatch = trimmed.match(/^proto_paths\s*:\s*["']?([^"'\n#]+)["']?/);
+				const inlineMatch = trimmed.match(
+					/^proto_paths\s*:\s*["']?([^"'\n#]+)["']?/,
+				);
 				if (inlineMatch && inlineMatch[1].trim()) {
 					const p = inlineMatch[1].trim();
 					protoPaths.push(path.resolve(configDir, p));
@@ -69,7 +71,9 @@ export async function readGapiConfig(
 			}
 
 			// Scalar form: proto_path: some/path
-			const scalarMatch = trimmed.match(/^proto_path\s*:\s*["']?([^"'\n#]+)["']?/);
+			const scalarMatch = trimmed.match(
+				/^proto_path\s*:\s*["']?([^"'\n#]+)["']?/,
+			);
 			if (scalarMatch) {
 				inProtoPathsList = false;
 				const p = scalarMatch[1].trim();
@@ -79,7 +83,10 @@ export async function readGapiConfig(
 
 			// List item inside proto_paths block: - some/path
 			if (inProtoPathsList && trimmed.startsWith("-")) {
-				const listItem = trimmed.replace(/^-\s*/, "").replace(/["']/g, "").trim();
+				const listItem = trimmed
+					.replace(/^-\s*/, "")
+					.replace(/["']/g, "")
+					.trim();
 				if (listItem) {
 					protoPaths.push(path.resolve(configDir, listItem));
 				}
@@ -87,7 +94,14 @@ export async function readGapiConfig(
 			}
 
 			// Any non-indented, non-list-item line that has a key resets list mode
-			if (inProtoPathsList && line.length > 0 && line[0] !== " " && line[0] !== "\t" && !trimmed.startsWith("-") && !trimmed.startsWith("#")) {
+			if (
+				inProtoPathsList &&
+				line.length > 0 &&
+				line[0] !== " " &&
+				line[0] !== "\t" &&
+				!trimmed.startsWith("-") &&
+				!trimmed.startsWith("#")
+			) {
 				inProtoPathsList = false;
 			}
 		}

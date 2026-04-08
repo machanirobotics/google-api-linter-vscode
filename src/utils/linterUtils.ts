@@ -76,10 +76,16 @@ function findApiLinterConfig(filePath: string): string | null {
 	let dir = path.resolve(path.dirname(filePath));
 	while (dir && (dir === rootAt || dir.startsWith(rootAt + path.sep))) {
 		const candidate = path.join(dir, CONFIG_FILE_NAME);
-		if (fs.existsSync(candidate)) {return candidate;}
-		if (dir === rootAt) {break;}
+		if (fs.existsSync(candidate)) {
+			return candidate;
+		}
+		if (dir === rootAt) {
+			break;
+		}
 		const parent = path.dirname(dir);
-		if (parent === dir) {break;}
+		if (parent === dir) {
+			break;
+		}
 		dir = parent;
 	}
 	const atRoot = path.join(rootAt, CONFIG_FILE_NAME);
@@ -96,7 +102,9 @@ function getProtobufRootProtoPath(filePath: string): string | null {
 	for (let i = parts.length - 2; i >= 0; i--) {
 		if (parts[i] === "protobuf") {
 			const protoRoot = parts.slice(0, i + 1).join(path.sep);
-			if (fs.existsSync(protoRoot)) {return protoRoot;}
+			if (fs.existsSync(protoRoot)) {
+				return protoRoot;
+			}
 			return null;
 		}
 	}
@@ -328,7 +336,9 @@ export function parseSyntaxErrorsForFile(
 
 	for (const line of lines) {
 		const match = line.match(errorRegex);
-		if (!match) {continue;}
+		if (!match) {
+			continue;
+		}
 		const filePathFromError = match[1].trim();
 		const lineStr = match[2];
 		const colStr = match[3];
@@ -338,7 +348,9 @@ export function parseSyntaxErrorsForFile(
 				? filePathFromError
 				: path.join(cwd, filePathFromError),
 		);
-		if (resolvedPath !== normalizedCurrent) {continue;}
+		if (resolvedPath !== normalizedCurrent) {
+			continue;
+		}
 
 		const lineNum = parseInt(lineStr, 10) - 1;
 		const colNum = Math.max(0, parseInt(colStr, 10) - 1);

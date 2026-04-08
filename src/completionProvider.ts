@@ -535,7 +535,8 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 			!currentTrimmed.startsWith("option");
 		// afterRpcName: current line has 'rpc Name(' but not 'returns('
 		const afterRpcName =
-			/rpc\s+\w+\s*\(/.test(currentTrimmed) && !/returns\s*\(/.test(currentTrimmed);
+			/rpc\s+\w+\s*\(/.test(currentTrimmed) &&
+			!/returns\s*\(/.test(currentTrimmed);
 		// afterReturns: current line has 'returns('
 		const afterReturns = /returns\s*\(/.test(currentTrimmed);
 

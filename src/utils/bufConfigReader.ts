@@ -78,8 +78,11 @@ export function readBufConfig(content: string): BufConfig {
 		}
 		// Only reset section tracking on top-level (unindented) keys that aren't
 		// sub-fields of modules (e.g. `path:` and `name:` are module sub-fields).
-		const isTopLevel = line.length > 0 && line[0] !== ' ' && line[0] !== '\t';
-		if (isTopLevel && (trimmed.startsWith("breaking:") || /^\w+:[^\S]*(#.*)?$/.test(trimmed))) {
+		const isTopLevel = line.length > 0 && line[0] !== " " && line[0] !== "\t";
+		if (
+			isTopLevel &&
+			(trimmed.startsWith("breaking:") || /^\w+:[^\S]*(#.*)?$/.test(trimmed))
+		) {
 			inModules = false;
 			inDeps = false;
 			continue;
@@ -171,18 +174,27 @@ function runBufExport(
 	} catch (e) {
 		log(`buf export failed: ${e instanceof Error ? e.message : String(e)}`);
 		try {
-			if (fs.existsSync(tmpDir)) {fs.rmSync(tmpDir, { recursive: true });}
+			if (fs.existsSync(tmpDir)) {
+				fs.rmSync(tmpDir, { recursive: true });
+			}
 		} catch {}
 		return null;
 	}
 }
 
 const BUF_CACHE_MS = 5 * 60 * 1000; // 5 minutes
-let bufPathsCache: { key: string; paths: string[]; at: number; tmpDir?: string } | null = null;
+let bufPathsCache: {
+	key: string;
+	paths: string[];
+	at: number;
+	tmpDir?: string;
+} | null = null;
 
 /** Clean up a previously exported tmp directory if it still exists. */
 export function cleanupPreviousTmpDir(tmpDir: string | undefined): void {
-	if (!tmpDir) {return;}
+	if (!tmpDir) {
+		return;
+	}
 	try {
 		if (fs.existsSync(tmpDir)) {
 			fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -265,6 +277,11 @@ export async function getBufProtoPaths(outputChannel?: {
 		paths.push(bufYamlDir);
 	}
 
-	bufPathsCache = { key: cacheKey, paths, at: Date.now(), tmpDir: exportDir ?? undefined };
+	bufPathsCache = {
+		key: cacheKey,
+		paths,
+		at: Date.now(),
+		tmpDir: exportDir ?? undefined,
+	};
 	return paths;
 }

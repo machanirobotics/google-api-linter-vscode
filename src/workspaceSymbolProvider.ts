@@ -31,7 +31,9 @@ export class ProtoWorkspaceSymbolProvider
 		const q = query.toLowerCase();
 
 		for (const uri of files) {
-			if (token.isCancellationRequested) {break;}
+			if (token.isCancellationRequested) {
+				break;
+			}
 			try {
 				const document = await vscode.workspace.openTextDocument(uri);
 				const symbols = parseProtoDocument(document);

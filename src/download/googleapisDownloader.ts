@@ -121,27 +121,28 @@ export class GoogleapisDownloader {
 						currentUrl,
 						{ headers: { ["User-Agent"]: "vscode-google-api-linter" } },
 						(response) => {
-						if (
-							response.statusCode === 301 ||
-							response.statusCode === 302 ||
-							response.statusCode === 307 ||
-							response.statusCode === 308
-						) {
-							const location = response.headers.location;
-							if (!location) {
-								reject(new Error("Redirect with no Location header"));
+							if (
+								response.statusCode === 301 ||
+								response.statusCode === 302 ||
+								response.statusCode === 307 ||
+								response.statusCode === 308
+							) {
+								const location = response.headers.location;
+								if (!location) {
+									reject(new Error("Redirect with no Location header"));
+									return;
+								}
+								response.resume(); // drain response before following
+								follow(location, hopsLeft - 1);
 								return;
 							}
-							response.resume(); // drain response before following
-							follow(location, hopsLeft - 1);
-							return;
-						}
-						response.pipe(file);
-						file.on("finish", () => {
-							file.close();
-							resolve();
-						});
-					})
+							response.pipe(file);
+							file.on("finish", () => {
+								file.close();
+								resolve();
+							});
+						},
+					)
 					.on("error", (error) => {
 						fs.unlinkSync(zipPath);
 						reject(error);

@@ -33,11 +33,17 @@ export class ProtoCodeActionProvider implements vscode.CodeActionProvider {
 				const isUpdate = /^Update/.test(method);
 				const isDelete = /^Delete/.test(method);
 				let path = "/v1/resources";
-				if (isGet && !isList) {path = "/v1/{name=resources/*}";}
-				else if (isList) {path = "/v1/{parent=resources}";}
-				else if (isCreate) {path = "/v1/{parent=resources}";}
-				else if (isUpdate) {path = "/v1/{resource.name=resources/*}";}
-				else if (isDelete) {path = "/v1/{name=resources/*}";}
+				if (isGet && !isList) {
+					path = "/v1/{name=resources/*}";
+				} else if (isList) {
+					path = "/v1/{parent=resources}";
+				} else if (isCreate) {
+					path = "/v1/{parent=resources}";
+				} else if (isUpdate) {
+					path = "/v1/{resource.name=resources/*}";
+				} else if (isDelete) {
+					path = "/v1/{name=resources/*}";
+				}
 				const httpMethod =
 					isGet && !isList
 						? "get"
@@ -121,7 +127,9 @@ export class ProtoCodeActionProvider implements vscode.CodeActionProvider {
 		const insertLine = rpcRange.start.line + 1;
 		let lines = `${inner}option (google.api.http) = {\n`;
 		lines += `${inner}  ${method}: "${path}";\n`;
-		if (withBody) {lines += `${inner}  body: "payload";\n`;}
+		if (withBody) {
+			lines += `${inner}  body: "payload";\n`;
+		}
 		lines += `${inner}};\n`;
 		edit.insert(document.uri, new vscode.Position(insertLine, 0), lines);
 		return edit;

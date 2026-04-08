@@ -114,7 +114,10 @@ export async function activate(context: vscode.ExtensionContext) {
 				if (e.affectsConfiguration("gapi")) {
 					// Dynamically update listeners when config changes
 					documentListeners.dispose();
-					documentListeners = registerDocumentListeners(context, linterProvider);
+					documentListeners = registerDocumentListeners(
+						context,
+						linterProvider,
+					);
 				}
 			}),
 		);

@@ -263,7 +263,10 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 				const candidate = path.join(root, importPath);
 				try {
 					if (require("node:fs").existsSync(candidate)) {
-						const location = await this.findDefinitionInFile(candidate, typeName);
+						const location = await this.findDefinitionInFile(
+							candidate,
+							typeName,
+						);
 						if (location) {
 							return location;
 						}
@@ -274,7 +277,11 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 			}
 
 			// Fallback: basename-only glob inside workspace (last resort)
-			const globPattern = path.join(workspaceRoot, "**", path.basename(importPath));
+			const globPattern = path.join(
+				workspaceRoot,
+				"**",
+				path.basename(importPath),
+			);
 			const files = await fg([globPattern]);
 			for (const file of files) {
 				const location = await this.findDefinitionInFile(file, typeName);

@@ -47,8 +47,12 @@ export class ProtoFormatProvider
 		kind: FormatterKind,
 		_options: vscode.FormattingOptions,
 	): Promise<string | null> {
-		if (kind === "simple") {return null;}
-		if (kind === "clang-format") {return this.formatWithClangFormat(document);}
+		if (kind === "simple") {
+			return null;
+		}
+		if (kind === "clang-format") {
+			return this.formatWithClangFormat(document);
+		}
 		return this.formatWithBuf(document);
 	}
 
@@ -97,8 +101,11 @@ export class ProtoFormatProvider
 					["format", "-w", tmpFile],
 					{ maxBuffer: 10 * 1024 * 1024 },
 					(err) => {
-						if (err) {reject(err);}
-						else {resolve();}
+						if (err) {
+							reject(err);
+						} else {
+							resolve();
+						}
 					},
 				);
 			});

@@ -41,23 +41,27 @@ export class ProtoFoldingRangeProvider implements vscode.FoldingRangeProvider {
 				let depth = 0;
 				for (let j = i; j < lines.length; j++) {
 					for (const ch of lines[j]) {
-						if (ch === "{") {depth++;}
-						else if (ch === "}") {
+						if (ch === "{") {
+							depth++;
+						} else if (ch === "}") {
 							depth--;
 							if (depth === 0) {
-								if (j > i)
-									{ranges.push(
+								if (j > i) {
+									ranges.push(
 										new vscode.FoldingRange(
 											i,
 											j,
 											vscode.FoldingRangeKind.Region,
 										),
-									);}
+									);
+								}
 								break;
 							}
 						}
 					}
-					if (depth === 0) {break;}
+					if (depth === 0) {
+						break;
+					}
 				}
 			}
 		}

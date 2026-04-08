@@ -15,18 +15,18 @@ const readFile = promisify(fs.readFile);
  * Handles downloading and managing googleapis protos
  */
 export class GoogleapisDownloader {
-	private readonly GAPI_DIR: string;
-	private readonly GOOGLEAPIS_DIR: string;
-	private readonly GOOGLEAPIS_METADATA_PATH: string;
+	private readonly gapiDir: string;
+	private readonly googleapisDir: string;
+	private readonly googleapisMetadataPath: string;
 	private outputChannel: vscode.OutputChannel;
 
 	constructor(outputChannel: vscode.OutputChannel) {
 		this.outputChannel = outputChannel;
 		const homeDir = os.homedir();
-		this.GAPI_DIR = path.join(homeDir, ".gapi");
-		this.GOOGLEAPIS_DIR = path.join(this.GAPI_DIR, "googleapis");
-		this.GOOGLEAPIS_METADATA_PATH = path.join(
-			this.GAPI_DIR,
+		this.gapiDir = path.join(homeDir, ".gapi");
+		this.googleapisDir = path.join(this.gapiDir, "googleapis");
+		this.googleapisMetadataPath = path.join(
+			this.gapiDir,
 			"googleapis-metadata.json",
 		);
 	}
@@ -36,7 +36,7 @@ export class GoogleapisDownloader {
 	 */
 	public async getGoogleapisCommit(): Promise<string> {
 		try {
-			const metadata = await readFile(this.GOOGLEAPIS_METADATA_PATH, "utf-8");
+			const metadata = await readFile(this.googleapisMetadataPath, "utf-8");
 			const data = JSON.parse(metadata);
 			return data.commit || "not downloaded";
 		} catch {
@@ -62,8 +62,8 @@ export class GoogleapisDownloader {
 
 			this.outputChannel.appendLine("Downloading googleapis from GitHub...");
 
-			const zipPath = path.join(this.GAPI_DIR, "googleapis.zip");
-			const extractPath = path.join(this.GAPI_DIR, "googleapis-temp");
+			const zipPath = path.join(this.gapiDir, "googleapis.zip");
+			const extractPath = path.join(this.gapiDir, "googleapis-temp");
 
 			await this.downloadGoogleapisZip(zipPath);
 			this.outputChannel.appendLine("Download complete, extracting...");
@@ -73,7 +73,9 @@ export class GoogleapisDownloader {
 
 			try {
 				fs.unlinkSync(zipPath);
-			} catch {}
+			} catch {
+				// ignore
+			}
 
 			await this.updateGoogleapisMetadata();
 			this.outputChannel.appendLine("googleapis downloaded successfully");
@@ -84,13 +86,13 @@ export class GoogleapisDownloader {
 	}
 
 	private async shouldDownloadGoogleapis(): Promise<boolean> {
-		if (!fs.existsSync(this.GOOGLEAPIS_DIR)) {
+		if (!fs.existsSync(this.googleapisDir)) {
 			return true;
 		}
 
 		try {
 			const metadataContent = await readFile(
-				this.GOOGLEAPIS_METADATA_PATH,
+				this.googleapisMetadataPath,
 				"utf-8",
 			);
 			const metadata = JSON.parse(metadataContent);
@@ -108,30 +110,44 @@ export class GoogleapisDownloader {
 				"https://github.com/googleapis/googleapis/archive/refs/heads/master.zip";
 			const file = createWriteStream(zipPath);
 
-			https
-				.get(url, (response) => {
-					if (response.statusCode === 302 || response.statusCode === 301) {
-						https
-							.get(response.headers.location!, (redirectResponse) => {
-								redirectResponse.pipe(file);
-								file.on("finish", () => {
-									file.close();
-									resolve();
-								});
-							})
-							.on("error", reject);
-					} else {
+			const follow = (currentUrl: string, hopsLeft: number) => {
+				if (hopsLeft <= 0) {
+					file.close();
+					reject(new Error("Too many redirects downloading googleapis"));
+					return;
+				}
+				https
+					.get(
+						currentUrl,
+						{ headers: { ["User-Agent"]: "vscode-google-api-linter" } },
+						(response) => {
+						if (
+							response.statusCode === 301 ||
+							response.statusCode === 302 ||
+							response.statusCode === 307 ||
+							response.statusCode === 308
+						) {
+							const location = response.headers.location;
+							if (!location) {
+								reject(new Error("Redirect with no Location header"));
+								return;
+							}
+							response.resume(); // drain response before following
+							follow(location, hopsLeft - 1);
+							return;
+						}
 						response.pipe(file);
 						file.on("finish", () => {
 							file.close();
 							resolve();
 						});
-					}
-				})
-				.on("error", (error) => {
-					fs.unlinkSync(zipPath);
-					reject(error);
-				});
+					})
+					.on("error", (error) => {
+						fs.unlinkSync(zipPath);
+						reject(error);
+					});
+			};
+			follow(url, 10);
 		});
 	}
 
@@ -152,14 +168,14 @@ export class GoogleapisDownloader {
 						try {
 							const extractedDir = path.join(extractPath, "googleapis-master");
 
-							if (fs.existsSync(this.GOOGLEAPIS_DIR)) {
-								fs.rmSync(this.GOOGLEAPIS_DIR, {
+							if (fs.existsSync(this.googleapisDir)) {
+								fs.rmSync(this.googleapisDir, {
 									recursive: true,
 									force: true,
 								});
 							}
 
-							fs.renameSync(extractedDir, this.GOOGLEAPIS_DIR);
+							fs.renameSync(extractedDir, this.googleapisDir);
 							fs.rmSync(extractPath, { recursive: true, force: true });
 
 							resolve();
@@ -181,10 +197,10 @@ export class GoogleapisDownloader {
 			lastChecked: Date.now(),
 			commit: "master",
 			source: "https://github.com/googleapis/googleapis",
-			path: this.GOOGLEAPIS_DIR,
+			path: this.googleapisDir,
 		};
 		await writeFile(
-			this.GOOGLEAPIS_METADATA_PATH,
+			this.googleapisMetadataPath,
 			JSON.stringify(metadata, null, 2),
 		);
 	}

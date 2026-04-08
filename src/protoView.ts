@@ -136,7 +136,7 @@ export class ProtoTreeDataProvider
 		mcpPrompts: LocationItem[];
 		others: LocationItem[];
 	}> {
-		if (this.scanCache) return this.scanCache;
+		if (this.scanCache) {return this.scanCache;}
 		const root = vscode.workspace.workspaceFolders?.[0]?.uri;
 		this.scanCache = root
 			? await scanWorkspaceProto(root)
@@ -481,15 +481,15 @@ export class ProtoTreeDataProvider
 		if (element?.kind === "section") {
 			const scan = await this.getScan();
 			if (element.id === "services")
-				return scan.services.map((service) => ({
+				{return scan.services.map((service) => ({
 					kind: "service" as const,
 					service,
-				}));
+				}));}
 			if (element.id === "resources")
-				return scan.resources.map((item) => ({
+				{return scan.resources.map((item) => ({
 					kind: "location" as const,
 					item,
-				}));
+				}));}
 			if (element.id === "mcp") {
 				return [
 					{
@@ -529,7 +529,7 @@ export class ProtoTreeDataProvider
 					fileNodes.push({ kind: "file", uri, errorCount, warningCount });
 				}
 				fileNodes.sort((a, b) => {
-					if (a.kind !== "file" || b.kind !== "file") return 0;
+					if (a.kind !== "file" || b.kind !== "file") {return 0;}
 					return vscode.workspace
 						.asRelativePath(a.uri)
 						.localeCompare(vscode.workspace.asRelativePath(b.uri));
@@ -547,18 +547,18 @@ export class ProtoTreeDataProvider
 				];
 			}
 			if (element.id === "enums")
-				return scan.others
+				{return scan.others
 					.filter((o) => o.detail === "enum")
-					.map((item) => ({ kind: "location" as const, item }));
+					.map((item) => ({ kind: "location" as const, item }));}
 			if (element.id === "rpcs")
-				return scan.rpcs.map((item) => ({ kind: "location" as const, item }));
+				{return scan.rpcs.map((item) => ({ kind: "location" as const, item }));}
 			if (element.id === "messages")
-				return scan.messages.map((item) => ({
+				{return scan.messages.map((item) => ({
 					kind: "location" as const,
 					item,
-				}));
+				}));}
 			if (element.id === "others")
-				return scan.others.map((item) => ({ kind: "location" as const, item }));
+				{return scan.others.map((item) => ({ kind: "location" as const, item }));}
 			return [];
 		}
 
@@ -640,20 +640,20 @@ export class ProtoTreeDataProvider
 		if (element?.kind === "mcpSubsection") {
 			const scan = await this.getScan();
 			if (element.id === "tools")
-				return scan.mcpTools.map((item) => ({
+				{return scan.mcpTools.map((item) => ({
 					kind: "location" as const,
 					item,
-				}));
+				}));}
 			if (element.id === "elicitation")
-				return scan.mcpElicitation.map((item) => ({
+				{return scan.mcpElicitation.map((item) => ({
 					kind: "location" as const,
 					item,
-				}));
+				}));}
 			if (element.id === "prompts")
-				return scan.mcpPrompts.map((item) => ({
+				{return scan.mcpPrompts.map((item) => ({
 					kind: "location" as const,
 					item,
-				}));
+				}));}
 			return [];
 		}
 
@@ -705,7 +705,7 @@ export class ProtoTreeDataProvider
 				});
 			}
 			fileNodes.sort((a, b) => {
-				if (a.kind !== "file" || b.kind !== "file") return 0;
+				if (a.kind !== "file" || b.kind !== "file") {return 0;}
 				return vscode.workspace
 					.asRelativePath(a.uri)
 					.localeCompare(vscode.workspace.asRelativePath(b.uri));
@@ -714,7 +714,7 @@ export class ProtoTreeDataProvider
 			return children;
 		}
 
-		if (element !== undefined) return [];
+		if (element !== undefined) {return [];}
 
 		const roots: ProtoTreeNode[] = [];
 

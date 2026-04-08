@@ -108,7 +108,16 @@ export async function activate(context: vscode.ExtensionContext) {
 			);
 		registerConfigValidation(context, configDiagnosticCollection);
 
-		registerDocumentListeners(context, linterProvider);
+		let documentListeners = registerDocumentListeners(context, linterProvider);
+		context.subscriptions.push(
+			vscode.workspace.onDidChangeConfiguration((e) => {
+				if (e.affectsConfiguration("gapi")) {
+					// Dynamically update listeners when config changes
+					documentListeners.dispose();
+					documentListeners = registerDocumentListeners(context, linterProvider);
+				}
+			}),
+		);
 	} catch (error) {
 		console.error("Failed to activate extension:", error);
 		vscode.window.showErrorMessage(
@@ -288,89 +297,56 @@ function registerSignatureHelpProvider(
 function registerDocumentListeners(
 	context: vscode.ExtensionContext,
 	linterProvider: ApiLinterProvider,
-): void {
+): vscode.Disposable {
+	const disposables: vscode.Disposable[] = [];
 	const config = vscode.workspace.getConfiguration("gapi");
 	const enableOnSave = config.get<boolean>("enableOnSave", true);
 	const enableOnType = config.get<boolean>("enableOnType", false);
-	const formatOnSave = config.get<boolean>("formatOnSave", true);
 
-	// Format proto files on save when gapi.formatOnSave is true (uses document buffer, not disk)
-	if (formatOnSave) {
-		context.subscriptions.push(
-			vscode.workspace.onWillSaveTextDocument((event) => {
-				if (!isProtoFile(event.document.fileName)) {
-					return;
-				}
-				event.waitUntil(
-					(async () => {
-						const doc = event.document;
-						const editorConfig = vscode.workspace.getConfiguration(
-							"editor",
-							doc.uri,
-						);
-						const options: vscode.FormattingOptions = {
-							tabSize: editorConfig.get<number>("tabSize", 2),
-							insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
-						};
-						const edits = await getFormatEdits(doc, options);
-						if (edits.length === 0) {
-							return;
-						}
-						const edit = new vscode.WorkspaceEdit();
-						for (const te of edits) {
-							edit.replace(doc.uri, te.range, te.newText);
-						}
-						await vscode.workspace.applyEdit(edit);
-					})(),
-				);
-			}),
-		);
-	}
-
+	// Lint on save
 	if (enableOnSave) {
-		context.subscriptions.push(
-			vscode.workspace.onDidSaveTextDocument(async (document) => {
-				if (isProtoFile(document.fileName)) {
-					await linterProvider.lintDocument(document);
+		disposables.push(
+			vscode.workspace.onDidSaveTextDocument((doc) => {
+				if (isProtoFile(doc.fileName)) {
+					linterProvider.lintDocument(doc);
 				}
 			}),
 		);
 	}
 
-	if (enableOnType) {
-		const timeouts = new Map<string, NodeJS.Timeout>();
-
-		context.subscriptions.push(
-			vscode.workspace.onDidChangeTextDocument(async (event) => {
-				if (isProtoFile(event.document.fileName)) {
-					const uri = event.document.uri.toString();
-
-					const existingTimeout = timeouts.get(uri);
-					if (existingTimeout) {
-						clearTimeout(existingTimeout);
-					}
-
-					const timeout = setTimeout(async () => {
-						// Don't save: avoids triggering format-on-save and overwriting the buffer
-						await linterProvider.lintDocument(event.document, false);
-						timeouts.delete(uri);
-					}, 1000);
-
-					timeouts.set(uri, timeout);
-				}
-			}),
-		);
-	}
-
-	context.subscriptions.push(
-		vscode.workspace.onDidChangeConfiguration((e) => {
-			if (e.affectsConfiguration("gapi")) {
-				vscode.window.showInformationMessage(
-					`${EXTENSION_NAME} configuration changed. Reload window for changes to take effect.`,
-				);
+	// Lint on open
+	disposables.push(
+		vscode.workspace.onDidOpenTextDocument((doc) => {
+			if (isProtoFile(doc.fileName)) {
+				linterProvider.lintDocument(doc);
 			}
 		}),
 	);
+
+	// Lint on type (debounced)
+	if (enableOnType) {
+		let timeout: NodeJS.Timeout | undefined;
+		disposables.push(
+			vscode.workspace.onDidChangeTextDocument((e) => {
+				if (isProtoFile(e.document.fileName)) {
+					if (timeout) {
+						clearTimeout(timeout);
+					}
+					timeout = setTimeout(() => {
+						linterProvider.lintDocument(e.document);
+					}, 1000); // 1s debounce
+				}
+			}),
+		);
+	}
+
+	// Initial lint if an editor is already active
+	const activeEditor = vscode.window.activeTextEditor;
+	if (activeEditor && isProtoFile(activeEditor.document.fileName)) {
+		linterProvider.lintDocument(activeEditor.document);
+	}
+
+	return vscode.Disposable.from(...disposables);
 }
 
 /**
@@ -395,5 +371,13 @@ export function deactivate() {
 	if (diagnosticCollection) {
 		diagnosticCollection.clear();
 		diagnosticCollection.dispose();
+	}
+
+	// Clean up any remaining buf export temp directories
+	try {
+		const { cleanupAllBufTmpDirs } = require("./utils/bufConfigReader");
+		cleanupAllBufTmpDirs();
+	} catch (e) {
+		console.error("Error during deactivation cleanup:", e);
 	}
 }

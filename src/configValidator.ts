@@ -69,7 +69,7 @@ function validateApiLinterYaml(
 								}
 							}
 						}
-						if (listLine.trim() && !listLine.trim().startsWith("-")) break;
+						if (listLine.trim() && !listLine.trim().startsWith("-")) {break;}
 					}
 				}
 			}
@@ -150,7 +150,7 @@ export function registerConfigValidation(
 	const run = (doc: vscode.TextDocument) => {
 		const name = path.basename(doc.uri.fsPath);
 		if (name !== ".api-linter.yaml" && name !== "workspace.protobuf.yaml")
-			return;
+			{return;}
 		const diags = validateConfigDocument(doc);
 		configDiagnosticCollection.set(doc.uri, diags);
 	};

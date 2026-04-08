@@ -41,10 +41,13 @@ function findMatchingBrace(
 	for (let i = startLine; i < lines.length; i++) {
 		const line = lines[i];
 		for (const ch of line) {
-			if (ch === openCh) depth++;
-			else if (ch === closeCh) {
+			if (ch === openCh) {
+				depth++;
+			} else if (ch === closeCh) {
 				depth--;
-				if (depth === 0) return i;
+				if (depth === 0) {
+					return i;
+				}
 			}
 		}
 	}
@@ -191,6 +194,7 @@ function parseNestedMessages(
 			i++;
 			continue;
 		}
+		// Nested message
 		const match = line.match(RE_MESSAGE);
 		if (match) {
 			const name = match[2];
@@ -204,12 +208,45 @@ function parseNestedMessages(
 			i = closeLine + 1;
 			continue;
 		}
+		// Nested enum
+		const enumMatch = line.match(RE_ENUM);
+		if (enumMatch) {
+			const name = enumMatch[1];
+			const nameStart = line.indexOf(name);
+			const nameEnd = nameStart + name.length;
+			const hasBrace = line.includes("{");
+			const closeLine = hasBrace ? findMatchingBrace(lines, i, "{") : i;
+			const selectionRange = lineRange(document, i, nameStart, nameEnd);
+			out.push({
+				name,
+				kind: "enumValue",
+				range: rangeFromLines(i, 0, closeLine, lines[closeLine].length),
+				selectionRange,
+			});
+			i = closeLine + 1;
+			continue;
+		}
+		// Skip oneof blocks (but don't add them as symbols)
 		const oneofMatch = line.match(RE_ONEOF);
 		if (oneofMatch) {
 			const hasBrace = line.includes("{");
 			const closeLine = hasBrace ? findMatchingBrace(lines, i, "{") : i;
 			i = closeLine + 1;
 			continue;
+		}
+		// Field symbols
+		const fieldMatch = line.match(RE_FIELD);
+		if (fieldMatch) {
+			const name = fieldMatch[2];
+			const nameStart = line.indexOf(name);
+			const nameEnd = nameStart + name.length;
+			out.push({
+				name,
+				kind: "field",
+				range: lineRange(document, i, 0, line.length),
+				selectionRange: lineRange(document, i, nameStart, nameEnd),
+				detail: fieldMatch[1],
+			});
 		}
 		i++;
 	}
@@ -251,7 +288,9 @@ export function parseMessageBody(
 	const endLine = findMatchingBrace(lines, startLine, "{");
 	for (let i = startLine + 1; i < endLine; i++) {
 		const line = lines[i];
-		if (RE_COMMENT.test(line.trim())) continue;
+		if (RE_COMMENT.test(line.trim())) {
+			continue;
+		}
 		const enumMatch = line.match(RE_ENUM);
 		if (enumMatch) {
 			const name = enumMatch[1];
@@ -294,7 +333,9 @@ export function flattenSymbols(symbols: ProtoSymbol[]): ProtoSymbol[] {
 	const result: ProtoSymbol[] = [];
 	function add(s: ProtoSymbol) {
 		result.push(s);
-		if (s.children) s.children.forEach(add);
+		if (s.children) {
+			s.children.forEach(add);
+		}
 	}
 	symbols.forEach(add);
 	return result;
@@ -306,10 +347,14 @@ export function getSymbolAtPosition(
 	position: vscode.Position,
 ): ProtoSymbol | undefined {
 	for (const s of symbols) {
-		if (s.selectionRange.contains(position)) return s;
+		if (s.selectionRange.contains(position)) {
+			return s;
+		}
 		if (s.children) {
 			const found = getSymbolAtPosition(s.children, position);
-			if (found) return found;
+			if (found) {
+				return found;
+			}
 		}
 	}
 	return undefined;
@@ -330,7 +375,9 @@ export function collectTypeReferences(
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		if (RE_COMMENT.test(line)) continue;
+		if (RE_COMMENT.test(line)) {
+			continue;
+		}
 
 		let m: RegExpExecArray | null;
 		const re1 = new RegExp(reFieldType.source, "g");
@@ -340,8 +387,9 @@ export function collectTypeReferences(
 				/^(double|float|int32|int64|uint32|uint64|sint32|sint64|fixed32|fixed64|sfixed32|sfixed64|bool|string|bytes)$/.test(
 					typeName,
 				)
-			)
+			) {
 				continue;
+			}
 			const typeStart = m.index + m[0].indexOf(m[1]);
 			refs.push({
 				typeName,

@@ -6,7 +6,6 @@ export const CONFIG_TEMPLATE = `# Google API Linter Configuration
 # See: https://linter.aip.dev/configuration
 # Config must be an array of rule blocks (api-linter lint.Configs).
 
----
 - included_paths:
     - "**/*.proto"
   # Disable specific rules

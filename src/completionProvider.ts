@@ -411,7 +411,9 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 		const importMatch = linePrefix.match(
 			/import\s*(?:public\s+)?["']([^"']*)$/,
 		);
-		if (!importMatch) return [];
+		if (!importMatch) {
+			return [];
+		}
 
 		const pathPrefix = importMatch[1];
 		const docDir = path.dirname(document.uri.fsPath);
@@ -428,10 +430,16 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 		for (const uri of protoUris) {
 			const fsPath = uri.fsPath;
 			for (const root of allRoots) {
-				if (!fsPath.startsWith(root)) continue;
+				if (!fsPath.startsWith(root)) {
+					continue;
+				}
 				const rel = path.relative(root, fsPath).replace(/\\/g, "/");
-				if (rel.startsWith("..")) continue;
-				if (!rel.endsWith(".proto")) continue;
+				if (rel.startsWith("..")) {
+					continue;
+				}
+				if (!rel.endsWith(".proto")) {
+					continue;
+				}
 				const existing = pathToLabel.get(rel);
 				if (existing === undefined || rel.length < existing.length) {
 					pathToLabel.set(rel, rel);
@@ -441,7 +449,9 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 
 		const items: vscode.CompletionItem[] = [];
 		for (const rel of pathToLabel.keys()) {
-			if (pathPrefix && !rel.startsWith(pathPrefix)) continue;
+			if (pathPrefix && !rel.startsWith(pathPrefix)) {
+				continue;
+			}
 			const item = new vscode.CompletionItem(
 				rel,
 				vscode.CompletionItemKind.File,
@@ -473,7 +483,9 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 			const line = lines[i];
 			const trimmed = line.trim();
 
-			if (trimmed.startsWith("//") || trimmed.startsWith("/*")) continue;
+			if (trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+				continue;
+			}
 
 			if (/^\s*oneof\s+\w+/.test(line)) {
 				inOneof++;
@@ -493,11 +505,14 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 					blockAtDepth[braceDepth] =
 						pendingBlock ?? blockAtDepth[braceDepth - 1];
 					pendingBlock = undefined;
-					if (afterOption && trimmed.includes("google.api.http"))
+					if (afterOption && trimmed.includes("google.api.http")) {
 						inHttpOption = true;
+					}
 				} else if (ch === "}") {
 					braceDepth--;
-					if (inHttpOption && braceDepth >= 0) inHttpOption = false;
+					if (inHttpOption && braceDepth >= 0) {
+						inHttpOption = false;
+					}
 				}
 			}
 
@@ -513,13 +528,16 @@ export class ProtoCompletionProvider implements vscode.CompletionItemProvider {
 
 		const currentLine = lines[lines.length - 1] || "";
 		const currentTrimmed = currentLine.trim();
+		// inRpc: cursor is on a line that starts an rpc declaration (not an option line)
 		const inRpc =
 			inService &&
-			/rpc\s+\w+/.test(text) &&
+			/rpc\s+\w+/.test(currentTrimmed) &&
 			!currentTrimmed.startsWith("option");
+		// afterRpcName: current line has 'rpc Name(' but not 'returns('
 		const afterRpcName =
-			/rpc\s+\w+\s*\(/.test(text) && !/returns\s*\(/.test(text);
-		const afterReturns = /returns\s*\(/.test(text);
+			/rpc\s+\w+\s*\(/.test(currentTrimmed) && !/returns\s*\(/.test(currentTrimmed);
+		// afterReturns: current line has 'returns('
+		const afterReturns = /returns\s*\(/.test(currentTrimmed);
 
 		return {
 			atLineStart:

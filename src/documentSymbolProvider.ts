@@ -18,7 +18,7 @@ function toDocumentSymbol(s: ProtoSymbol): vscode.DocumentSymbol {
 		s.range,
 		s.selectionRange,
 	);
-	if (s.children?.length) sym.children = s.children.map(toDocumentSymbol);
+	if (s.children?.length) {sym.children = s.children.map(toDocumentSymbol);}
 	return sym;
 }
 

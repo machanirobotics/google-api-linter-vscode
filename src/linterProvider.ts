@@ -78,8 +78,6 @@ export class ApiLinterProvider {
 
 					await this.binaryManager.ensureGoogleapis();
 					await this.binaryManager.ensureProtobuf();
-					await getProtoPaths(this.outputChannel);
-
 					const options = await this.getLinterOptions();
 					let diagnostics = await this.runLinter(binaryPath, filePath, options);
 					const bufSyntaxDiagnostics = await runBufSyntaxCheck(
@@ -187,7 +185,9 @@ export class ApiLinterProvider {
 	 */
 	public async lintUri(uri: vscode.Uri): Promise<void> {
 		const filePath = uri.fsPath;
-		if (!filePath.endsWith(".proto")) return;
+		if (!filePath.endsWith(".proto")) {
+			return;
+		}
 
 		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
 		try {
@@ -200,7 +200,6 @@ export class ApiLinterProvider {
 			}
 			await this.binaryManager.ensureGoogleapis();
 			await this.binaryManager.ensureProtobuf();
-			await getProtoPaths(this.outputChannel);
 			const options = await this.getLinterOptions();
 			let diagnostics = await this.runLinter(binaryPath, filePath, options);
 			const bufSyntaxDiagnostics = await runBufSyntaxCheck(

@@ -29,7 +29,7 @@ export class ProtoRenameProvider implements vscode.RenameProvider {
 		) {
 			return null;
 		}
-		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(newName)) return null;
+		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(newName)) {return null;}
 
 		const oldName = symbol.name;
 		const targetSimple = simpleName(oldName);
@@ -52,7 +52,7 @@ export class ProtoRenameProvider implements vscode.RenameProvider {
 		// Other files: definitions and references
 		const allProto = await findProtoFiles();
 		for (const uri of allProto) {
-			if (token.isCancellationRequested) break;
+			if (token.isCancellationRequested) {break;}
 			try {
 				const doc = await vscode.workspace.openTextDocument(uri);
 				const otherSymbols = parseProtoDocument(doc);
@@ -65,7 +65,7 @@ export class ProtoRenameProvider implements vscode.RenameProvider {
 								l.range.isEqual(s.selectionRange),
 						);
 						if (!already)
-							locations.push(new vscode.Location(uri, s.selectionRange));
+							{locations.push(new vscode.Location(uri, s.selectionRange));}
 					}
 				}
 				if (uri.toString() !== document.uri.toString()) {

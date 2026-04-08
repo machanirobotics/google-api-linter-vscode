@@ -201,11 +201,17 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 		try {
 			const document = await vscode.workspace.openTextDocument(contextUri);
 			let loc = await this.findDefinitionInCurrentFile(document, typeName);
-			if (loc) return loc;
+			if (loc) {
+				return loc;
+			}
 			loc = await this.findDefinitionInCurrentFile(document, simpleName);
-			if (loc) return loc;
+			if (loc) {
+				return loc;
+			}
 			loc = await this.findDefinitionInImports(document, typeName);
-			if (loc) return loc;
+			if (loc) {
+				return loc;
+			}
 			loc = await this.findDefinitionInImports(document, simpleName);
 			return loc;
 		} catch {
@@ -229,31 +235,52 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 			imports.push(match[2]);
 		}
 
-		// Get workspace root
+		// Get workspace root and all proto search roots
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 		if (!workspaceRoot) {
 			return null;
 		}
+		const docDir = path.dirname(document.uri.fsPath);
+		const homeDir = require("node:os").homedir();
+		const searchRoots = [
+			workspaceRoot,
+			docDir,
+			path.join(homeDir, ".gapi", "googleapis"),
+			path.join(homeDir, ".gapi", "protobuf", "src"),
+			path.join(homeDir, ".gapi", "protobuf"),
+		].filter((r) => {
+			try {
+				return require("node:fs").existsSync(r);
+			} catch {
+				return false;
+			}
+		});
 
-		// Build search paths for all imported files
-		const searchPaths: string[] = [];
 		for (const importPath of imports) {
-			const searchPath = path.join(
-				workspaceRoot,
-				"**",
-				path.basename(importPath),
-			);
-			searchPaths.push(searchPath);
-		}
+			// Search using the full import path relative to each known root
+			// (preserves directory structure so store/v1/foo.proto ≠ payment/v1/foo.proto)
+			for (const root of searchRoots) {
+				const candidate = path.join(root, importPath);
+				try {
+					if (require("node:fs").existsSync(candidate)) {
+						const location = await this.findDefinitionInFile(candidate, typeName);
+						if (location) {
+							return location;
+						}
+					}
+				} catch {
+					// skip
+				}
+			}
 
-		// Use fast-glob to find all matching files
-		const files = await fg(searchPaths);
-
-		// Search in each imported file
-		for (const file of files) {
-			const location = await this.findDefinitionInFile(file, typeName);
-			if (location) {
-				return location;
+			// Fallback: basename-only glob inside workspace (last resort)
+			const globPattern = path.join(workspaceRoot, "**", path.basename(importPath));
+			const files = await fg([globPattern]);
+			for (const file of files) {
+				const location = await this.findDefinitionInFile(file, typeName);
+				if (location) {
+					return location;
+				}
 			}
 		}
 

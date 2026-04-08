@@ -13,7 +13,7 @@ export class ProtoSymbolHoverProvider implements vscode.HoverProvider {
 	): vscode.ProviderResult<vscode.Hover> {
 		const symbols = parseProtoDocument(document);
 		const symbol = getSymbolAtPosition(symbols, position);
-		if (!symbol) return null;
+		if (!symbol) {return null;}
 
 		const md = new vscode.MarkdownString();
 		md.isTrusted = true;
@@ -44,7 +44,7 @@ export class ProtoSymbolHoverProvider implements vscode.HoverProvider {
 			case "rpc":
 				md.appendMarkdown(`**rpc** \`${symbol.name}\`\n\n`);
 				if (symbol.detail)
-					md.appendMarkdown(`\`\`\`\n${symbol.detail}\n\`\`\`\n\n`);
+					{md.appendMarkdown(`\`\`\`\n${symbol.detail}\n\`\`\`\n\n`);}
 				md.appendMarkdown("RPC method.");
 				break;
 			default:

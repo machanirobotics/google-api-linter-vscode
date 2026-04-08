@@ -22,7 +22,7 @@ export class ProtoReferenceProvider implements vscode.ReferenceProvider {
 		const nameAtPosition = document.getText(
 			document.getWordRangeAtPosition(position),
 		);
-		if (!nameAtPosition) return null;
+		if (!nameAtPosition) {return null;}
 
 		const targetSimple = simpleName(nameAtPosition);
 		const locations: vscode.Location[] = [];
@@ -43,7 +43,7 @@ export class ProtoReferenceProvider implements vscode.ReferenceProvider {
 		// Other workspace proto files: references and definition
 		const allProto = await findProtoFiles();
 		for (const uri of allProto) {
-			if (token.isCancellationRequested) break;
+			if (token.isCancellationRequested) {break;}
 			try {
 				const doc = await vscode.workspace.openTextDocument(uri);
 				if (context.includeDeclaration) {
@@ -57,7 +57,7 @@ export class ProtoReferenceProvider implements vscode.ReferenceProvider {
 									l.range.isEqual(s.selectionRange),
 							);
 							if (!alreadyHasDef)
-								locations.push(new vscode.Location(uri, s.selectionRange));
+								{locations.push(new vscode.Location(uri, s.selectionRange));}
 						}
 					}
 				}

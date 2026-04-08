@@ -24,19 +24,27 @@ export class BinaryManager {
 		return this.downloadManager.getProtobufCommit();
 	}
 
-	public async ensureBinary(): Promise<string> {
-		return this.downloadManager.ensureBinary();
+	public async ensureBinary(force = false): Promise<string> {
+		return this.downloadManager.ensureBinary(force);
 	}
 
-	public async ensureGoogleapis(): Promise<void> {
-		return this.downloadManager.ensureGoogleapis();
+	public async ensureGoogleapis(force = false): Promise<void> {
+		return this.downloadManager.ensureGoogleapis(force);
 	}
 
-	public async ensureProtobuf(): Promise<void> {
-		return this.downloadManager.ensureProtobuf();
+	public async ensureProtobuf(force = false): Promise<void> {
+		return this.downloadManager.ensureProtobuf(force);
 	}
 
 	public async checkAndUpdate(): Promise<void> {
 		return this.downloadManager.checkAndUpdate();
+	}
+
+	public getGoogleapisDir(): string {
+		return this.downloadManager.getGoogleapisDir();
+	}
+
+	public getProtobufDir(): string {
+		return this.downloadManager.getProtobufDir();
 	}
 }

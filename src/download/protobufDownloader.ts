@@ -45,6 +45,14 @@ export class ProtobufDownloader {
 	}
 
 	/**
+	 * Gets the protobuf directory path
+	 * Protos are in the src subdirectory of the downloaded repository
+	 */
+	public getProtobufDir(): string {
+		return path.join(this.protobufDir, "src");
+	}
+
+	/**
 	 * Ensures protobuf protos are downloaded
 	 */
 	public async ensureProtobuf(): Promise<void> {

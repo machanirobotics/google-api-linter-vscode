@@ -45,6 +45,13 @@ export class GoogleapisDownloader {
 	}
 
 	/**
+	 * Gets the googleapis directory path
+	 */
+	public getGoogleapisDir(): string {
+		return this.googleapisDir;
+	}
+
+	/**
 	 * Ensures googleapis protos are downloaded
 	 */
 	public async ensureGoogleapis(): Promise<void> {

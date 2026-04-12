@@ -63,8 +63,9 @@ export async function readGapiConfig(
 				const inlineMatch = trimmed.match(
 					/^proto_paths\s*:\s*["']?([^"'\n#]+)["']?/,
 				);
-				if (inlineMatch && inlineMatch[1].trim()) {
-					const p = inlineMatch[1].trim();
+				const inlinePath = inlineMatch?.[1]?.trim();
+				if (inlinePath) {
+					const p = inlinePath;
 					protoPaths.push(path.resolve(configDir, p));
 				}
 				continue;

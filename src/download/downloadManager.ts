@@ -1,4 +1,4 @@
-import type * as vscode from "vscode";
+import type { AppendLineLogger } from "../types";
 import { ApiLinterDownloader } from "./apiLinterDownloader";
 import { GoogleapisDownloader } from "./googleapisDownloader";
 import { ProtobufDownloader } from "./protobufDownloader";
@@ -16,7 +16,7 @@ export class DownloadManager {
 	private googleapisEnsured = false;
 	private protobufEnsured = false;
 
-	constructor(outputChannel: vscode.OutputChannel) {
+	constructor(outputChannel: AppendLineLogger) {
 		this.apiLinterDownloader = new ApiLinterDownloader(outputChannel);
 		this.googleapisDownloader = new GoogleapisDownloader(outputChannel);
 		this.protobufDownloader = new ProtobufDownloader(outputChannel);

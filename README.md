@@ -8,7 +8,7 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Real-time Linting**: Automatically validates `.proto` files as you type or save
 - **Inline Diagnostics**: Displays linting errors and warnings directly in the editor
 - **Hover Documentation**: Shows detailed rule information when hovering over diagnostics
-- **Proto View (Activity Bar)**: Debugger-style sidebar with **Lint**, **Format**, **Reload**; **Services** (expand to RPCs, then Request/Response—click to go to type in file); **Resources**; **MCP** (Tools, Elicitation, Prompts); **Messages** (expand for fields and enums); **Enums**; **Deps** (googleapis, protobuf); **Files** with pastel status (cyan=OK, magenta=warning, blue=error). **Collapse All** in the title bar. Click any item to jump to that symbol or type in the file. Right‑click a file to **Lint** or **Format** that file.
+- **Proto View (Activity Bar)**: Debugger-style sidebar with **Lint**, **Format**, **Reload**; **Report Issue** (GitHub icon) opens a pre-filled bug issue on GitHub; **Services** (expand to RPCs, then Request/Response—click to go to type in file); **Resources**; **MCP** (Tools, Elicitation, Prompts); **Messages** (expand for fields and enums); **Enums**; **Deps** (googleapis, protobuf); **Files** with pastel status (cyan=OK, magenta=warning, blue=error). **Collapse All** in the title bar. Click any item to jump to that symbol or type in the file. Right‑click a file to **Lint** or **Format** that file.
 - **Status Bar**: Shows "Proto" or "Proto: X error(s), Y warning(s)"; click to open the Proto view
 - **Config File Validation**: Warnings for unknown keys and invalid paths in `.api-linter.yaml` and `workspace.protobuf.yaml`
 
@@ -16,7 +16,7 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Syntax Highlighting**: Full Protocol Buffers syntax highlighting with TextMate grammar
 - **IntelliSense**: Completions, signature help, and hover for messages, services, RPCs, options (`google.api.http`, `google.api.resource`, `mcp.protobuf.*`), and keywords
 - **Import Path Completion**: After `import "`, suggests `.proto` paths from the workspace and configured proto paths
-- **Format Document**: Format `.proto` files with **buf format -w** (if `buf` is installed) or a built-in indent formatter; format-on-save uses buf by default
+- **Format Document**: Format `.proto` files with **buf format** (if `buf` is installed), **clang-format**, or a built-in **simple** indent; **`gapi.formatOnSave`** formats the **buffer** on save (see Troubleshooting if you also use Editor: Format On Save)
 - **Code Snippets**: Snippets for proto3, messages, services, RPCs, HTTP/resource options, MCP options, and a full **resource + service** (`resourceservice`) that generates a `_service.proto` with a resource message and List/Get/Create/Update/Delete RPCs
 - **Document Links**: Clickable `import "path/to/file.proto"` links that open the imported file
 - **Go to Definition / Find References**: Navigate to message, enum, and service definitions and find all references
@@ -37,6 +37,14 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Update Notifications**: Prompts when new api-linter versions are available
 - **Configurable Rules**: Enable or disable specific linting rules via configuration
 - **Cross-Platform**: Works on Windows, macOS, and Linux
+
+## Troubleshooting
+
+- **Imports / go-to-definition until reload**: The extension resolves imports using the same roots as linting (`workspace.protobuf.yaml`, **buf export**, `gapi.protoPath`, `~/.gapi`). After changing **buf.yaml** or **buf.lock**, paths refresh automatically; if something still looks stale, run **Developer: Reload Window**.
+- **Double format on save**: With **`gapi.formatOnSave`** enabled, the extension formats in **will save** from the **in-memory** buffer (so buf matches unsaved edits). If you also use **Editor: Format On Save**, VS Code may run a second format pass; disable one of them if that is unwanted.
+- **Buf / api-linter not found**: Set **`gapi.bufPath`** and **`gapi.binaryPath`** to absolute paths if they are not on `PATH`. The first run may download deps into `~/.gapi` (needs network).
+- **Rapid saves and lint**: If you save twice very quickly, the linter **re-runs** after the first pass finishes so the latest file state is still covered.
+- **Verbose linter logs**: Set **`gapi.debugLintLogging`** to `true` to print full applied settings on **every** lint; default logs settings only when they change.
 
 ## Architecture
 

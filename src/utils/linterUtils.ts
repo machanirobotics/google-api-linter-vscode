@@ -7,20 +7,29 @@ import YAML from "yaml";
 import { CONFIG_FILE_NAME } from "../constants";
 import type { LinterOptions, LinterOutput, LinterProblem } from "../types";
 
+export type ResolvedApiLinterConfig = {
+	/** Path passed to api-linter --config */
+	path: string;
+	/** Temp file to delete after the run, if any */
+	tempFile: string | null;
+};
+
 /**
  * api-linter expects config to be an array of config objects (lint.Configs).
  * If the file is a single map (e.g. disabled_rules at top level), wrap it in an array
  * and write to a temp file so the binary can parse it.
  */
-function resolveConfigToArrayFormat(configPath: string): string {
+function resolveConfigToArrayFormat(
+	configPath: string,
+): ResolvedApiLinterConfig {
 	try {
 		const raw = fs.readFileSync(configPath, "utf8");
 		const parsed = YAML.parse(raw);
 		if (parsed === null || typeof parsed !== "object") {
-			return configPath;
+			return { path: configPath, tempFile: null };
 		}
 		if (Array.isArray(parsed)) {
-			return configPath;
+			return { path: configPath, tempFile: null };
 		}
 		// Single map: wrap in array and write to temp file
 		const arrayConfig = [parsed];
@@ -29,9 +38,9 @@ function resolveConfigToArrayFormat(configPath: string): string {
 			`api-linter-config-${Date.now()}-${Math.random().toString(36).slice(2)}.yaml`,
 		);
 		fs.writeFileSync(tempPath, YAML.stringify(arrayConfig), "utf8");
-		return tempPath;
+		return { path: tempPath, tempFile: tempPath };
 	} catch {
-		return configPath;
+		return { path: configPath, tempFile: null };
 	}
 }
 
@@ -120,15 +129,23 @@ function getProtobufRootProtoPath(filePath: string): string | null {
 export const buildLinterArgs = (
 	filePath: string,
 	options: LinterOptions,
-): { args: string[]; workingDir: string; fileName: string } => {
+): {
+	args: string[];
+	workingDir: string;
+	fileName: string;
+	/** Temp config from resolveConfigToArrayFormat — unlink after spawn completes */
+	tempConfigPath: string | null;
+} => {
 	const args: string[] = [];
+	let tempConfigPath: string | null = null;
 
 	const configToUse = options.configPath
 		? resolveWorkspaceVariables(options.configPath, filePath)
 		: findApiLinterConfig(filePath);
 	if (configToUse && fs.existsSync(configToUse)) {
-		const resolvedConfig = resolveConfigToArrayFormat(configToUse);
-		args.push("--config", resolvedConfig);
+		const resolved = resolveConfigToArrayFormat(configToUse);
+		args.push("--config", resolved.path);
+		tempConfigPath = resolved.tempFile;
 	}
 
 	const absolutePath = path.isAbsolute(filePath)
@@ -193,7 +210,7 @@ export const buildLinterArgs = (
 	args.push("--output-format", "json");
 	args.push(fileName);
 
-	return { args, workingDir, fileName };
+	return { args, workingDir, fileName, tempConfigPath };
 };
 
 /**

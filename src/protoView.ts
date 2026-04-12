@@ -6,12 +6,13 @@ import {
 	type ServiceItem,
 	scanWorkspaceProto,
 } from "./protoScanner";
-import { parseMessageBody } from "./utils/protoParser";
 import {
 	findGapiConfigFile,
 	findGapiConfigFileInFolder,
 } from "./utils/configReader";
 import { findProtoFiles, findProtoFilesInFolder } from "./utils/fileUtils";
+import { invalidateProtoImportRootsCache } from "./utils/protoImportRoots";
+import { parseMessageBody } from "./utils/protoParser";
 
 export type ProtoTreeNode =
 	| {
@@ -120,8 +121,14 @@ export class ProtoTreeDataProvider
 		) => Promise<vscode.Location | null>,
 	) {}
 
-	refresh(): void {
+	/** Full rescan (config / protos structure changed). */
+	refreshStructure(): void {
 		this.scanCache = null;
+		this._onDidChangeTreeData.fire(undefined);
+	}
+
+	/** Tree labels only (e.g. diagnostic counts); keeps structural scan cache. */
+	refreshPresentation(): void {
 		this._onDidChangeTreeData.fire(undefined);
 	}
 
@@ -882,7 +889,7 @@ export function registerProtoView(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("googleApiLinter.refreshProtoView", () => {
-			treeDataProvider.refresh();
+			treeDataProvider.refreshStructure();
 		}),
 	);
 
@@ -894,7 +901,7 @@ export function registerProtoView(
 				);
 			} catch {
 				// Built-in command only exists when view is created with createTreeView; fallback refresh
-				treeDataProvider.refresh();
+				treeDataProvider.refreshPresentation();
 			}
 		}),
 	);
@@ -913,12 +920,50 @@ export function registerProtoView(
 		),
 	);
 
-	vscode.languages.onDidChangeDiagnostics(() => treeDataProvider.refresh());
-	const watcher = vscode.workspace.createFileSystemWatcher(
+	let diagRefreshTimer: NodeJS.Timeout | undefined;
+	const scheduleDiagRefresh = () => {
+		if (diagRefreshTimer) {
+			clearTimeout(diagRefreshTimer);
+		}
+		diagRefreshTimer = setTimeout(() => {
+			diagRefreshTimer = undefined;
+			treeDataProvider.refreshPresentation();
+		}, 350);
+	};
+	context.subscriptions.push(
+		vscode.languages.onDidChangeDiagnostics(() => scheduleDiagRefresh()),
+	);
+
+	const gapiWatcher = vscode.workspace.createFileSystemWatcher(
 		"**/workspace.protobuf.yaml",
 	);
-	watcher.onDidCreate(() => treeDataProvider.refresh());
-	watcher.onDidChange(() => treeDataProvider.refresh());
-	watcher.onDidDelete(() => treeDataProvider.refresh());
-	context.subscriptions.push(watcher);
+	gapiWatcher.onDidCreate(() => treeDataProvider.refreshStructure());
+	gapiWatcher.onDidChange(() => treeDataProvider.refreshStructure());
+	gapiWatcher.onDidDelete(() => treeDataProvider.refreshStructure());
+	context.subscriptions.push(gapiWatcher);
+
+	const bufWatcher = vscode.workspace.createFileSystemWatcher(
+		"**/{buf.yaml,buf.lock}",
+	);
+	bufWatcher.onDidCreate(() => {
+		invalidateProtoImportRootsCache();
+		treeDataProvider.refreshStructure();
+	});
+	bufWatcher.onDidChange(() => {
+		invalidateProtoImportRootsCache();
+		treeDataProvider.refreshStructure();
+	});
+	bufWatcher.onDidDelete(() => {
+		invalidateProtoImportRootsCache();
+		treeDataProvider.refreshStructure();
+	});
+	context.subscriptions.push(bufWatcher);
+
+	context.subscriptions.push(
+		new vscode.Disposable(() => {
+			if (diagRefreshTimer !== undefined) {
+				clearTimeout(diagRefreshTimer);
+			}
+		}),
+	);
 }

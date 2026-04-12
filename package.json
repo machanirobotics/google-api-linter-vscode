@@ -122,7 +122,7 @@
 				"gapi.formatOnSave": {
 					"type": "boolean",
 					"default": true,
-					"description": "Format .proto files when you save."
+					"description": "When true, formats the proto buffer on save (before write) using gapi.formatter. Uses the in-memory document so buf matches your edits. If you also use Editor: Format On Save, you may get two format passes; set one off if that bothers you."
 				},
 				"gapi.formatter": {
 					"type": "string",
@@ -143,6 +143,11 @@
 					"type": "string",
 					"default": "buf",
 					"description": "Path to buf binary for formatting. If not set, assumes 'buf' is in PATH."
+				},
+				"gapi.debugLintLogging": {
+					"type": "boolean",
+					"default": false,
+					"description": "If true, log full linter settings to the output channel on every lint. When false, settings are logged only when they change (or on first lint)."
 				}
 			}
 		},

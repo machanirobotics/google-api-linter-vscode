@@ -21,6 +21,9 @@ export class ApiLinterProvider {
 	private binaryManager: BinaryManager;
 	private workspaceLintInProgress = false;
 	private activeLintUris = new Set<string>();
+	/** When a lint is already running for a URI, set true so we run one more pass after it finishes. */
+	private lintAgainPending = new Map<string, boolean>();
+	private lastOptionsLogFingerprint: string | null = null;
 
 	/**
 	 * Creates a new linter provider.
@@ -64,6 +67,7 @@ export class ApiLinterProvider {
 		const uriStr = document.uri.toString();
 
 		if (this.activeLintUris.has(uriStr)) {
+			this.lintAgainPending.set(uriStr, true);
 			return;
 		}
 
@@ -141,6 +145,11 @@ export class ApiLinterProvider {
 			}
 		} finally {
 			this.activeLintUris.delete(uriStr);
+			const runAgain = this.lintAgainPending.get(uriStr);
+			this.lintAgainPending.delete(uriStr);
+			if (runAgain) {
+				void this.lintDocument(document, saveFirst, silent);
+			}
 		}
 	}
 
@@ -178,49 +187,60 @@ export class ApiLinterProvider {
 			setExitStatus: config.get<boolean>("setExitStatus") || false,
 		};
 
-		// Log applied settings
-		this.outputChannel.appendLine("=".repeat(60));
-		this.outputChannel.appendLine("Applied Linter Settings:");
-		this.outputChannel.appendLine(
-			`  Config Path: ${options.configPath || "(not set)"}`,
-		);
-		this.outputChannel.appendLine(`  Proto Paths (${allProtoPaths.length}):`);
-		if (configProtoPaths.length > 0) {
+		const debugLint =
+			config.get<boolean>("debugLintLogging", false) === true;
+		const fingerprint = JSON.stringify({
+			configPath: options.configPath,
+			configProtoPaths,
+			userProtoPaths,
+			disableRules: options.disableRules,
+			enableRules: options.enableRules,
+		});
+		if (debugLint || fingerprint !== this.lastOptionsLogFingerprint) {
+			this.lastOptionsLogFingerprint = fingerprint;
+			this.outputChannel.appendLine("=".repeat(60));
+			this.outputChannel.appendLine("Applied Linter Settings:");
 			this.outputChannel.appendLine(
-				`    From workspace.protobuf.yaml and/or buf.yaml (modules + deps): ${configProtoPaths.length} path(s)`,
+				`  Config Path: ${options.configPath || "(not set)"}`,
 			);
-			configProtoPaths.forEach((p: string) =>
-				this.outputChannel.appendLine(`      - ${p}`),
-			);
-		}
-		if (userProtoPaths.length > 0) {
+			this.outputChannel.appendLine(`  Proto Paths (${allProtoPaths.length}):`);
+			if (configProtoPaths.length > 0) {
+				this.outputChannel.appendLine(
+					`    From workspace.protobuf.yaml and/or buf.yaml (modules + deps): ${configProtoPaths.length} path(s)`,
+				);
+				configProtoPaths.forEach((p: string) =>
+					this.outputChannel.appendLine(`      - ${p}`),
+				);
+			}
+			if (userProtoPaths.length > 0) {
+				this.outputChannel.appendLine(
+					`    From settings.json: ${userProtoPaths.length} path(s)`,
+				);
+				userProtoPaths.forEach((p) =>
+					this.outputChannel.appendLine(`      - ${p}`),
+				);
+			}
+			if (options.disableRules.length > 0) {
+				this.outputChannel.appendLine(
+					`  Disabled Rules: ${options.disableRules.join(", ")}`,
+				);
+			}
+			if (options.enableRules.length > 0) {
+				this.outputChannel.appendLine(
+					`  Enabled Rules: ${options.enableRules.join(", ")}`,
+				);
+			}
 			this.outputChannel.appendLine(
-				`    From settings.json: ${userProtoPaths.length} path(s)`,
+				`  Set Exit Status: ${options.setExitStatus}`,
 			);
-			userProtoPaths.forEach((p) =>
-				this.outputChannel.appendLine(`      - ${p}`),
-			);
-		}
-		if (options.disableRules.length > 0) {
 			this.outputChannel.appendLine(
-				`  Disabled Rules: ${options.disableRules.join(", ")}`,
+				`  Enable on Save: ${config.get<boolean>("enableOnSave")}`,
 			);
-		}
-		if (options.enableRules.length > 0) {
 			this.outputChannel.appendLine(
-				`  Enabled Rules: ${options.enableRules.join(", ")}`,
+				`  Enable on Type: ${config.get<boolean>("enableOnType")}`,
 			);
+			this.outputChannel.appendLine("=".repeat(60));
 		}
-		this.outputChannel.appendLine(
-			`  Set Exit Status: ${options.setExitStatus}`,
-		);
-		this.outputChannel.appendLine(
-			`  Enable on Save: ${config.get<boolean>("enableOnSave")}`,
-		);
-		this.outputChannel.appendLine(
-			`  Enable on Type: ${config.get<boolean>("enableOnType")}`,
-		);
-		this.outputChannel.appendLine("=".repeat(60));
 
 		return options;
 	}
@@ -228,24 +248,41 @@ export class ApiLinterProvider {
 	/**
 	 * Lints a single file by URI (does not require the document to be open).
 	 */
-	public async lintUri(uri: vscode.Uri): Promise<void> {
+	public async lintUri(
+		uri: vscode.Uri,
+		preloaded?: { binaryPath: string; options: LinterOptions },
+	): Promise<void> {
 		const filePath = uri.fsPath;
 		if (!filePath.endsWith(".proto")) {
 			return;
 		}
 
+		const uriStr = uri.toString();
+		if (this.activeLintUris.has(uriStr)) {
+			return;
+		}
+		this.activeLintUris.add(uriStr);
+
 		this.outputChannel.appendLine(`Starting lint for: ${filePath}`);
 		try {
-			this.outputChannel.appendLine(
-				"Ensuring deps (binary, googleapis, protobuf, buf)…",
-			);
-			const binaryPath = await this.binaryManager.ensureBinary();
-			if (!require("node:fs").existsSync(binaryPath)) {
-				throw new Error(`Binary not found at ${binaryPath} after download`);
+			let binaryPath: string;
+			let options: LinterOptions;
+			if (preloaded) {
+				binaryPath = preloaded.binaryPath;
+				options = preloaded.options;
+			} else {
+				this.outputChannel.appendLine(
+					"Ensuring deps (binary, googleapis, protobuf, buf)…",
+				);
+				binaryPath = await this.binaryManager.ensureBinary();
+				if (!require("node:fs").existsSync(binaryPath)) {
+					throw new Error(`Binary not found at ${binaryPath} after download`);
+				}
+				await this.binaryManager.ensureGoogleapis();
+				await this.binaryManager.ensureProtobuf();
+				options = await this.getLinterOptions();
 			}
-			await this.binaryManager.ensureGoogleapis();
-			await this.binaryManager.ensureProtobuf();
-			const options = await this.getLinterOptions();
+
 			let diagnostics = await this.runLinter(binaryPath, filePath, options);
 			const bufSyntaxDiagnostics = await runBufSyntaxCheck(
 				filePath,
@@ -268,6 +305,8 @@ export class ApiLinterProvider {
 				uri,
 				bufSyntaxDiagnostics.length > 0 ? bufSyntaxDiagnostics : [],
 			);
+		} finally {
+			this.activeLintUris.delete(uriStr);
 		}
 	}
 
@@ -299,12 +338,24 @@ export class ApiLinterProvider {
 					cancellable: false,
 				},
 				async (progress) => {
+					progress.report({ message: "Ensuring deps…" });
+					const binaryPath = await this.binaryManager.ensureBinary();
+					if (!require("node:fs").existsSync(binaryPath)) {
+						throw new Error(
+							`Binary not found at ${binaryPath} after download`,
+						);
+					}
+					await this.binaryManager.ensureGoogleapis();
+					await this.binaryManager.ensureProtobuf();
+					const options = await this.getLinterOptions();
+					const preloaded = { binaryPath, options };
+
 					for (let i = 0; i < protoFiles.length; i++) {
 						progress.report({
 							message: `Linting ${i + 1}/${total}…`,
 							increment: (100 / total) * (i === 0 ? 0 : 1),
 						});
-						await this.lintUri(protoFiles[i]);
+						await this.lintUri(protoFiles[i], preloaded);
 					}
 					progress.report({ message: "Done", increment: 100 });
 				},
@@ -330,7 +381,19 @@ export class ApiLinterProvider {
 		options: LinterOptions,
 	): Promise<vscode.Diagnostic[]> {
 		return new Promise((resolve, reject) => {
-			const { args, workingDir } = buildLinterArgs(filePath, options);
+			const { args, workingDir, tempConfigPath } = buildLinterArgs(
+				filePath,
+				options,
+			);
+			const cleanupTempConfig = () => {
+				if (tempConfigPath) {
+					try {
+						require("node:fs").unlinkSync(tempConfigPath);
+					} catch {
+						// ignore
+					}
+				}
+			};
 
 			this.outputChannel.appendLine(`Running: ${binaryPath} ${args.join(" ")}`);
 			this.outputChannel.appendLine(`Working directory: ${workingDir}`);
@@ -349,6 +412,7 @@ export class ApiLinterProvider {
 			});
 
 			process.on("error", (error: Error) => {
+				cleanupTempConfig();
 				if ((error as NodeJS.ErrnoException).code === "ENOENT") {
 					reject(
 						new Error(
@@ -361,51 +425,55 @@ export class ApiLinterProvider {
 			});
 
 			process.on("close", (code: number) => {
-				if (stderr) {
-					this.outputChannel.appendLine(`stderr: ${stderr}`);
-				}
+				try {
+					if (stderr) {
+						this.outputChannel.appendLine(`stderr: ${stderr}`);
+					}
 
-				// Log raw output for debugging
-				this.outputChannel.appendLine(
-					`Raw linter output (first 500 chars): ${stdout.substring(0, 500)}`,
-				);
-
-				// Try to parse diagnostics from stdout first (standard JSON output)
-				let diagnostics = parseLinterOutput(stdout, this.outputChannel);
-
-				// If no diagnostics found from stdout, check stderr (syntax errors often go here)
-				if (diagnostics.length === 0 && stderr.trim().length > 0) {
-					const stderrDiagnostics = parseLinterOutput(
-						stderr,
-						this.outputChannel,
+					// Log raw output for debugging
+					this.outputChannel.appendLine(
+						`Raw linter output (first 500 chars): ${stdout.substring(0, 500)}`,
 					);
-					if (stderrDiagnostics.length > 0) {
-						diagnostics = stderrDiagnostics;
+
+					// Try to parse diagnostics from stdout first (standard JSON output)
+					let diagnostics = parseLinterOutput(stdout, this.outputChannel);
+
+					// If no diagnostics found from stdout, check stderr (syntax errors often go here)
+					if (diagnostics.length === 0 && stderr.trim().length > 0) {
+						const stderrDiagnostics = parseLinterOutput(
+							stderr,
+							this.outputChannel,
+						);
+						if (stderrDiagnostics.length > 0) {
+							diagnostics = stderrDiagnostics;
+							this.outputChannel.appendLine(
+								`Found ${diagnostics.length} diagnostic(s) in stderr`,
+							);
+						}
+					}
+
+					// Only reject if we failed and found no diagnostics
+					if (diagnostics.length === 0 && code !== 0 && code !== 1) {
+						this.outputChannel.appendLine(`api-linter exited with code ${code}`);
+						this.outputChannel.appendLine(`stdout: ${stdout}`);
+						reject(new Error(`api-linter exited with code ${code}`));
+						return;
+					}
+
+					if (
+						diagnostics.length === 0 &&
+						stdout.trim() !== "" &&
+						stdout.trim() !== "[]" &&
+						stderr.trim() === ""
+					) {
 						this.outputChannel.appendLine(
-							`Found ${diagnostics.length} diagnostic(s) in stderr`,
+							`Warning: No diagnostics parsed from output`,
 						);
 					}
+					resolve(diagnostics);
+				} finally {
+					cleanupTempConfig();
 				}
-
-				// Only reject if we failed and found no diagnostics
-				if (diagnostics.length === 0 && code !== 0 && code !== 1) {
-					this.outputChannel.appendLine(`api-linter exited with code ${code}`);
-					this.outputChannel.appendLine(`stdout: ${stdout}`);
-					reject(new Error(`api-linter exited with code ${code}`));
-					return;
-				}
-
-				if (
-					diagnostics.length === 0 &&
-					stdout.trim() !== "" &&
-					stdout.trim() !== "[]" &&
-					stderr.trim() === ""
-				) {
-					this.outputChannel.appendLine(
-						`Warning: No diagnostics parsed from output`,
-					);
-				}
-				resolve(diagnostics);
 			});
 		});
 	}

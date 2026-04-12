@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import fg from "fast-glob";
+import { getProtoImportSearchRoots } from "./protoImportRoots";
 
 /**
  * Checks if a file is a Protocol Buffer file based on its extension.
@@ -34,4 +36,43 @@ export const findProtoFilesInFolder = async (
 	const all = await findProtoFiles();
 	const prefix = folderUri.fsPath.replace(/\/?$/, "/");
 	return all.filter((u) => u.fsPath.startsWith(prefix));
+};
+
+/**
+ * Workspace .proto files plus any under import roots (e.g. buf export) for find-references.
+ */
+export const findProtoFilesForReferences = async (): Promise<vscode.Uri[]> => {
+	const seen = new Set<string>();
+	const out: vscode.Uri[] = [];
+	const add = (u: vscode.Uri) => {
+		const s = u.toString();
+		if (!seen.has(s)) {
+			seen.add(s);
+			out.push(u);
+		}
+	};
+	for (const u of await findProtoFiles()) {
+		add(u);
+	}
+	try {
+		const roots = await getProtoImportSearchRoots(undefined);
+		for (const root of roots) {
+			try {
+				const files = await fg("**/*.proto", {
+					cwd: root,
+					ignore: ["**/node_modules/**"],
+					absolute: true,
+					followSymbolicLinks: false,
+				});
+				for (const f of files) {
+					add(vscode.Uri.file(f));
+				}
+			} catch {
+				// skip root
+			}
+		}
+	} catch {
+		// ignore extra roots
+	}
+	return out;
 };

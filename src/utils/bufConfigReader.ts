@@ -211,6 +211,14 @@ export function cleanupAllBufTmpDirs(): void {
 	}
 }
 
+/** Drop buf export cache so the next getBufProtoPaths / getProtoPaths run refreshes (e.g. buf.yaml changed). */
+export function invalidateBufProtoPathsCache(): void {
+	if (bufPathsCache?.tmpDir) {
+		cleanupPreviousTmpDir(bufPathsCache.tmpDir);
+	}
+	bufPathsCache = null;
+}
+
 function getBufCacheKey(bufYamlPath: string): string {
 	try {
 		const stat = fs.statSync(bufYamlPath);

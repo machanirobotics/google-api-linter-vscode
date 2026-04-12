@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import fg = require("fast-glob");
+import { getProtoImportSearchRoots } from "./utils/protoImportRoots";
 
 /**
  * Provides go-to-definition for proto types like google.protobuf.Timestamp
@@ -235,26 +236,26 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 			imports.push(match[2]);
 		}
 
-		// Get workspace root and all proto search roots
 		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 		if (!workspaceRoot) {
 			return null;
 		}
 		const docDir = path.dirname(document.uri.fsPath);
-		const homeDir = require("node:os").homedir();
-		const searchRoots = [
-			workspaceRoot,
-			docDir,
-			path.join(homeDir, ".gapi", "googleapis"),
-			path.join(homeDir, ".gapi", "protobuf", "src"),
-			path.join(homeDir, ".gapi", "protobuf"),
-		].filter((r) => {
-			try {
-				return require("node:fs").existsSync(r);
-			} catch {
-				return false;
+		const importRoots = await getProtoImportSearchRoots(undefined);
+		const searchRootsSeen = new Set<string>();
+		const searchRoots: string[] = [];
+		const pushRoot = (r: string) => {
+			const n = path.resolve(r);
+			if (!searchRootsSeen.has(n)) {
+				searchRootsSeen.add(n);
+				searchRoots.push(n);
 			}
-		});
+		};
+		pushRoot(docDir);
+		pushRoot(workspaceRoot);
+		for (const r of importRoots) {
+			pushRoot(r);
+		}
 
 		for (const importPath of imports) {
 			// Search using the full import path relative to each known root

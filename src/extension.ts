@@ -33,6 +33,7 @@ import { ProtoSignatureHelpProvider } from "./signatureHelpProvider";
 import { registerStatusBar } from "./statusBar";
 import { ProtoSymbolHoverProvider } from "./symbolHoverProvider";
 import { getActiveProtoEditor, isProtoFile } from "./utils/fileUtils";
+import { invalidateProtoImportRootsCache } from "./utils/protoImportRoots";
 import { ProtoWorkspaceSymbolProvider } from "./workspaceSymbolProvider";
 
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -112,6 +113,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (e.affectsConfiguration("gapi")) {
+					invalidateProtoImportRootsCache();
 					// Dynamically update listeners when config changes
 					documentListeners.dispose();
 					documentListeners = registerDocumentListeners(
@@ -305,6 +307,40 @@ function registerDocumentListeners(
 	const config = vscode.workspace.getConfiguration("gapi");
 	const enableOnSave = config.get<boolean>("enableOnSave", true);
 	const enableOnType = config.get<boolean>("enableOnType", false);
+	const formatOnSave = config.get<boolean>("formatOnSave", true);
+
+	// gapi.formatOnSave: format buffer before save (uses getFormatEdits; avoids stale disk with buf)
+	if (formatOnSave) {
+		disposables.push(
+			vscode.workspace.onWillSaveTextDocument((event) => {
+				if (!isProtoFile(event.document.fileName)) {
+					return;
+				}
+				event.waitUntil(
+					(async () => {
+						const doc = event.document;
+						const editorConfig = vscode.workspace.getConfiguration(
+							"editor",
+							doc.uri,
+						);
+						const options: vscode.FormattingOptions = {
+							tabSize: editorConfig.get<number>("tabSize", 2),
+							insertSpaces: editorConfig.get<boolean>("insertSpaces", true),
+						};
+						const edits = await getFormatEdits(doc, options);
+						if (edits.length === 0) {
+							return;
+						}
+						const edit = new vscode.WorkspaceEdit();
+						for (const te of edits) {
+							edit.replace(doc.uri, te.range, te.newText);
+						}
+						await vscode.workspace.applyEdit(edit);
+					})(),
+				);
+			}),
+		);
+	}
 
 	// Lint on save
 	if (enableOnSave) {
@@ -336,8 +372,8 @@ function registerDocumentListeners(
 						clearTimeout(timeout);
 					}
 					timeout = setTimeout(() => {
-						linterProvider.lintDocument(e.document);
-					}, 1000); // 1s debounce
+						void linterProvider.lintDocument(e.document, false, true);
+					}, 1000); // 1s debounce, silent (no progress spam)
 				}
 			}),
 		);

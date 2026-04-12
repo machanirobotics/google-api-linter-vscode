@@ -27,7 +27,11 @@ export class ProtoFormatProvider
 				);
 				return [vscode.TextEdit.replace(fullRange, formatted)];
 			}
-			return this.simpleFormat(document, options);
+			// Never fall back to naive simpleFormat when buf/clang-format failed — it corrupts protos.
+			if (formatter === "simple") {
+				return this.simpleFormat(document, options);
+			}
+			return [];
 		});
 	}
 
@@ -177,7 +181,7 @@ export function registerFormatProvider(
 
 /**
  * Returns formatting edits for a proto document (used for format-on-save).
- * Uses the same logic as the document formatter: buf format if available, else simple indent.
+ * Uses the same logic as the document formatter (no destructive simple fallback when formatter is buf/clang-format).
  */
 export async function getFormatEdits(
 	document: vscode.TextDocument,

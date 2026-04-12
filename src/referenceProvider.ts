@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { findProtoFiles } from "./utils/fileUtils";
+import { findProtoFilesForReferences } from "./utils/fileUtils";
 import {
 	collectTypeReferences,
 	flattenSymbols,
@@ -43,7 +43,7 @@ export class ProtoReferenceProvider implements vscode.ReferenceProvider {
 		}
 
 		// Other workspace proto files: references and definition
-		const allProto = await findProtoFiles();
+		const allProto = await findProtoFilesForReferences();
 		for (const uri of allProto) {
 			if (token.isCancellationRequested) {
 				break;

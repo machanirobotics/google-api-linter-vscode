@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import * as fs from "node:fs";
 import {
 	createConnection,
 	type Diagnostic,
@@ -184,8 +185,21 @@ async function runLinter(
 			setExitStatus: false,
 		};
 
-		const { args, workingDir } = buildLinterArgs(filePath, options);
+		const { args, workingDir, tempConfigPath } = buildLinterArgs(
+			filePath,
+			options,
+		);
 		args.push(...settings.additionalArgs);
+
+		const cleanupTempConfig = () => {
+			if (tempConfigPath) {
+				try {
+					fs.unlinkSync(tempConfigPath);
+				} catch {
+					// ignore
+				}
+			}
+		};
 
 		const process = cp.spawn(binaryPath, args, { cwd: workingDir });
 
@@ -201,6 +215,7 @@ async function runLinter(
 		});
 
 		process.on("error", (error: Error) => {
+			cleanupTempConfig();
 			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
 				reject(new Error(`api-linter binary not found at: ${binaryPath}`));
 			} else {
@@ -209,29 +224,33 @@ async function runLinter(
 		});
 
 		process.on("close", (code: number) => {
-			if (stderr) {
-				connection.console.log(`stderr: ${stderr}`);
-			}
-
-			if (code !== 0 && code !== 1) {
-				connection.console.log(`api-linter exited with code ${code}`);
-				reject(new Error(`api-linter exited with code ${code}`));
-				return;
-			}
-
 			try {
-				const vscDiagnostics = parseLinterOutput(stdout);
-				const diagnostics = vscDiagnostics.map((d) => ({
-					severity: DiagnosticSeverity.Error,
-					range: d.range,
-					message: d.message,
-					source: d.source,
-					code: typeof d.code === "object" ? d.code.value : d.code,
-				}));
-				resolve(diagnostics);
-			} catch (error) {
-				connection.console.error(`Failed to parse linter output: ${error}`);
-				resolve([]);
+				if (stderr) {
+					connection.console.log(`stderr: ${stderr}`);
+				}
+
+				if (code !== 0 && code !== 1) {
+					connection.console.log(`api-linter exited with code ${code}`);
+					reject(new Error(`api-linter exited with code ${code}`));
+					return;
+				}
+
+				try {
+					const vscDiagnostics = parseLinterOutput(stdout);
+					const diagnostics = vscDiagnostics.map((d) => ({
+						severity: DiagnosticSeverity.Error,
+						range: d.range,
+						message: d.message,
+						source: d.source,
+						code: typeof d.code === "object" ? d.code.value : d.code,
+					}));
+					resolve(diagnostics);
+				} catch (error) {
+					connection.console.error(`Failed to parse linter output: ${error}`);
+					resolve([]);
+				}
+			} finally {
+				cleanupTempConfig();
 			}
 		});
 	});

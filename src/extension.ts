@@ -29,10 +29,11 @@ import { ApiLinterProvider } from "./linterProvider";
 import { registerProtoView } from "./protoView";
 import { ProtoReferenceProvider } from "./referenceProvider";
 import { ProtoRenameProvider } from "./renameProvider";
+import { registerReportIssueCommand } from "./reportIssue";
 import { ProtoSignatureHelpProvider } from "./signatureHelpProvider";
 import { registerStatusBar } from "./statusBar";
 import { ProtoSymbolHoverProvider } from "./symbolHoverProvider";
-import { getActiveProtoEditor, isProtoFile } from "./utils/fileUtils";
+import { isProtoFile } from "./utils/fileUtils";
 import { invalidateProtoImportRootsCache } from "./utils/protoImportRoots";
 import { ProtoWorkspaceSymbolProvider } from "./workspaceSymbolProvider";
 
@@ -90,6 +91,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(createUpdateGoogleapisCommitCommand());
 		context.subscriptions.push(createReinstallCommand(binaryManager));
 		context.subscriptions.push(createInitWorkspaceCommand());
+		context.subscriptions.push(registerReportIssueCommand(context));
 
 		registerProtoView(
 			context,
@@ -296,11 +298,11 @@ function registerSignatureHelpProvider(
 /**
  * Registers document event listeners for auto-linting.
  * Handles save, change, open, and configuration change events.
- * @param context - The extension context
+ * @param _context - The extension context (reserved for future subscriptions)
  * @param linterProvider - The linter provider instance
  */
 function registerDocumentListeners(
-	context: vscode.ExtensionContext,
+	_context: vscode.ExtensionContext,
 	linterProvider: ApiLinterProvider,
 ): vscode.Disposable {
 	const disposables: vscode.Disposable[] = [];
@@ -386,21 +388,6 @@ function registerDocumentListeners(
 	}
 
 	return vscode.Disposable.from(...disposables);
-}
-
-/**
- * Lints the currently active proto file if one is open.
- */
-function lintActiveProtoFile(): void {
-	try {
-		const editor = getActiveProtoEditor();
-		if (editor) {
-			console.log("Active editor is proto file, linting immediately");
-			linterProvider.lintDocument(editor.document);
-		}
-	} catch (error) {
-		console.error("Error in lintActiveProtoFile:", error);
-	}
 }
 
 /**

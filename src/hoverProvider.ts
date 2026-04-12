@@ -154,8 +154,9 @@ export class ApiLinterHoverProvider implements vscode.HoverProvider {
 	 * @returns Markdown-formatted guidance text
 	 */
 	private async fetchRuleGuidance(ruleUri: string): Promise<string> {
-		if (this.guidanceCache.has(ruleUri)) {
-			return this.guidanceCache.get(ruleUri)!;
+		const cached = this.guidanceCache.get(ruleUri);
+		if (cached !== undefined) {
+			return cached;
 		}
 
 		try {

@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import fg = require("fast-glob");
+
 import { getProtoImportSearchRoots } from "./utils/protoImportRoots";
 
 /**
@@ -230,9 +231,12 @@ export class ProtoDefinitionProvider implements vscode.DefinitionProvider {
 		const content = document.getText();
 		const importRegex = /^\s*import\s+('|")(.+\.proto)('|")\s*;\s*$/gim;
 		const imports: string[] = [];
-		let match;
-
-		while ((match = importRegex.exec(content))) {
+		let match: RegExpExecArray | null;
+		for (;;) {
+			match = importRegex.exec(content);
+			if (!match) {
+				break;
+			}
 			imports.push(match[2]);
 		}
 

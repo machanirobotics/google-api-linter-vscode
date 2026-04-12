@@ -1,3 +1,8 @@
+/** Minimal logger with appendLine only (vscode OutputChannel or LSP console bridge). */
+export interface AppendLineLogger {
+	appendLine(value: string): void;
+}
+
 /**
  * Metadata about the installed api-linter binary.
  */

@@ -8,7 +8,7 @@ A Visual Studio Code extension that integrates the [Google API Linter](https://g
 - **Real-time Linting**: Automatically validates `.proto` files as you type or save
 - **Inline Diagnostics**: Displays linting errors and warnings directly in the editor
 - **Hover Documentation**: Shows detailed rule information when hovering over diagnostics
-- **Proto View (Activity Bar)**: Debugger-style sidebar with **Lint**, **Format**, **Reload**; **Services** (expand to RPCs, then Request/Response—click to go to type in file); **Resources**; **MCP** (Tools, Elicitation, Prompts); **Messages** (expand for fields and enums); **Enums**; **Deps** (googleapis, protobuf); **Files** with pastel status (cyan=OK, magenta=warning, blue=error). **Collapse All** in the title bar. Click any item to jump to that symbol or type in the file. Right‑click a file to **Lint** or **Format** that file.
+- **Proto View (Activity Bar)**: Debugger-style sidebar with **Lint**, **Format**, **Reload**; **Report Issue** (GitHub icon) opens a pre-filled bug issue on GitHub; **Services** (expand to RPCs, then Request/Response—click to go to type in file); **Resources**; **MCP** (Tools, Elicitation, Prompts); **Messages** (expand for fields and enums); **Enums**; **Deps** (googleapis, protobuf); **Files** with pastel status (cyan=OK, magenta=warning, blue=error). **Collapse All** in the title bar. Click any item to jump to that symbol or type in the file. Right‑click a file to **Lint** or **Format** that file.
 - **Status Bar**: Shows "Proto" or "Proto: X error(s), Y warning(s)"; click to open the Proto view
 - **Config File Validation**: Warnings for unknown keys and invalid paths in `.api-linter.yaml` and `workspace.protobuf.yaml`
 

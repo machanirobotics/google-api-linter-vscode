@@ -1,5 +1,5 @@
-import type * as vscode from "vscode";
 import { DownloadManager } from "./download/downloadManager";
+import type { AppendLineLogger } from "./types";
 
 /**
  * Manages downloads for the extension.
@@ -8,7 +8,7 @@ import { DownloadManager } from "./download/downloadManager";
 export class BinaryManager {
 	private downloadManager: DownloadManager;
 
-	constructor(outputChannel: vscode.OutputChannel) {
+	constructor(outputChannel: AppendLineLogger) {
 		this.downloadManager = new DownloadManager(outputChannel);
 	}
 

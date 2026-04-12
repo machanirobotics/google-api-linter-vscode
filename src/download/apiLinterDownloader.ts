@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
-import type { BinaryMetadata } from "../types";
+import type { AppendLineLogger, BinaryMetadata } from "../types";
 import { downloadFile, fetchJson } from "../utils/httpClient";
 import { getArch, getPlatform } from "../utils/platformUtils";
 
@@ -17,6 +17,16 @@ const chmod = promisify(fs.chmod);
 const GITHUB_API =
 	"https://api.github.com/repos/googleapis/api-linter/releases/latest";
 
+type GitHubReleaseAsset = {
+	name: string;
+	browser_download_url: string;
+};
+
+type GitHubRelease = {
+	tag_name: string;
+	assets: GitHubReleaseAsset[];
+};
+
 /**
  * Handles downloading and managing the api-linter binary
  */
@@ -24,9 +34,9 @@ export class ApiLinterDownloader {
 	private readonly GAPI_DIR: string;
 	private readonly BINARY_PATH: string;
 	private readonly METADATA_PATH: string;
-	private outputChannel: vscode.OutputChannel;
+	private outputChannel: AppendLineLogger;
 
-	constructor(outputChannel: vscode.OutputChannel) {
+	constructor(outputChannel: AppendLineLogger) {
 		this.outputChannel = outputChannel;
 		const homeDir = os.homedir();
 		this.GAPI_DIR = path.join(homeDir, ".gapi");
@@ -129,7 +139,7 @@ export class ApiLinterDownloader {
 	}
 
 	private async getLatestVersion(): Promise<string> {
-		const release: any = await fetchJson(GITHUB_API);
+		const release = (await fetchJson(GITHUB_API)) as GitHubRelease;
 		return release.tag_name;
 	}
 
@@ -147,7 +157,7 @@ export class ApiLinterDownloader {
 		try {
 			this.outputChannel.appendLine("Downloading api-linter binary...");
 
-			const release: any = await fetchJson(GITHUB_API);
+			const release = (await fetchJson(GITHUB_API)) as GitHubRelease;
 			const version = release.tag_name;
 			this.outputChannel.appendLine(`Latest version: ${version}`);
 
@@ -157,7 +167,7 @@ export class ApiLinterDownloader {
 				const platform = getPlatform();
 				const arch = getArch();
 				throw new Error(
-					`No compatible binary found for ${platform}-${arch}. Available assets: ${release.assets.map((a: any) => a.name).join(", ")}`,
+					`No compatible binary found for ${platform}-${arch}. Available assets: ${release.assets.map((a) => a.name).join(", ")}`,
 				);
 			}
 
@@ -188,12 +198,14 @@ export class ApiLinterDownloader {
 		}
 	}
 
-	private findAssetForPlatform(assets: any[]): any {
+	private findAssetForPlatform(
+		assets: GitHubReleaseAsset[],
+	): GitHubReleaseAsset | undefined {
 		const platform = getPlatform();
 		const arch = getArch();
 		// Asset name includes version: api-linter-2.1.0-darwin-arm64.tar.gz
 		const assetPattern = `${platform}-${arch}.tar.gz`;
-		return assets.find((asset: any) => asset.name.includes(assetPattern));
+		return assets.find((asset) => asset.name.includes(assetPattern));
 	}
 
 	private async extractBinary(tarPath: string): Promise<void> {

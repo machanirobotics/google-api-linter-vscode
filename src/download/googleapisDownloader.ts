@@ -5,7 +5,7 @@ import https from "node:https";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type * as vscode from "vscode";
+import type { AppendLineLogger } from "../types";
 
 const exec = promisify(cp.exec);
 const writeFile = promisify(fs.writeFile);
@@ -18,9 +18,9 @@ export class GoogleapisDownloader {
 	private readonly gapiDir: string;
 	private readonly googleapisDir: string;
 	private readonly googleapisMetadataPath: string;
-	private outputChannel: vscode.OutputChannel;
+	private outputChannel: AppendLineLogger;
 
-	constructor(outputChannel: vscode.OutputChannel) {
+	constructor(outputChannel: AppendLineLogger) {
 		this.outputChannel = outputChannel;
 		const homeDir = os.homedir();
 		this.gapiDir = path.join(homeDir, ".gapi");
@@ -126,7 +126,7 @@ export class GoogleapisDownloader {
 				https
 					.get(
 						currentUrl,
-						{ headers: { ["User-Agent"]: "vscode-google-api-linter" } },
+						{ headers: { "User-Agent": "vscode-google-api-linter" } },
 						(response) => {
 							if (
 								response.statusCode === 301 ||

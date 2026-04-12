@@ -1,5 +1,4 @@
 import * as cp from "node:child_process";
-import * as path from "node:path";
 import * as vscode from "vscode";
 import { BinaryManager } from "./binaryManager";
 import type { LinterOptions } from "./types";
@@ -187,8 +186,7 @@ export class ApiLinterProvider {
 			setExitStatus: config.get<boolean>("setExitStatus") || false,
 		};
 
-		const debugLint =
-			config.get<boolean>("debugLintLogging", false) === true;
+		const debugLint = config.get<boolean>("debugLintLogging", false) === true;
 		const fingerprint = JSON.stringify({
 			configPath: options.configPath,
 			configProtoPaths,
@@ -208,17 +206,17 @@ export class ApiLinterProvider {
 				this.outputChannel.appendLine(
 					`    From workspace.protobuf.yaml and/or buf.yaml (modules + deps): ${configProtoPaths.length} path(s)`,
 				);
-				configProtoPaths.forEach((p: string) =>
-					this.outputChannel.appendLine(`      - ${p}`),
-				);
+				for (const p of configProtoPaths) {
+					this.outputChannel.appendLine(`      - ${p}`);
+				}
 			}
 			if (userProtoPaths.length > 0) {
 				this.outputChannel.appendLine(
 					`    From settings.json: ${userProtoPaths.length} path(s)`,
 				);
-				userProtoPaths.forEach((p) =>
-					this.outputChannel.appendLine(`      - ${p}`),
-				);
+				for (const p of userProtoPaths) {
+					this.outputChannel.appendLine(`      - ${p}`);
+				}
 			}
 			if (options.disableRules.length > 0) {
 				this.outputChannel.appendLine(
@@ -341,9 +339,7 @@ export class ApiLinterProvider {
 					progress.report({ message: "Ensuring deps…" });
 					const binaryPath = await this.binaryManager.ensureBinary();
 					if (!require("node:fs").existsSync(binaryPath)) {
-						throw new Error(
-							`Binary not found at ${binaryPath} after download`,
-						);
+						throw new Error(`Binary not found at ${binaryPath} after download`);
 					}
 					await this.binaryManager.ensureGoogleapis();
 					await this.binaryManager.ensureProtobuf();
@@ -454,7 +450,9 @@ export class ApiLinterProvider {
 
 					// Only reject if we failed and found no diagnostics
 					if (diagnostics.length === 0 && code !== 0 && code !== 1) {
-						this.outputChannel.appendLine(`api-linter exited with code ${code}`);
+						this.outputChannel.appendLine(
+							`api-linter exited with code ${code}`,
+						);
 						this.outputChannel.appendLine(`stdout: ${stdout}`);
 						reject(new Error(`api-linter exited with code ${code}`));
 						return;

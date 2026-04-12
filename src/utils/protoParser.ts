@@ -381,7 +381,11 @@ export function collectTypeReferences(
 
 		let m: RegExpExecArray | null;
 		const re1 = new RegExp(reFieldType.source, "g");
-		while ((m = re1.exec(line))) {
+		for (;;) {
+			m = re1.exec(line);
+			if (!m) {
+				break;
+			}
 			const typeName = (m[1].startsWith(".") ? m[1].slice(1) : m[1]).trim();
 			if (
 				/^(double|float|int32|int64|uint32|uint64|sint32|sint64|fixed32|fixed64|sfixed32|sfixed64|bool|string|bytes)$/.test(

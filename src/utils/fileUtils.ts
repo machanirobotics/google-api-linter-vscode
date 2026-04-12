@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import fg from "fast-glob";
+import * as vscode from "vscode";
 import { getProtoImportSearchRoots } from "./protoImportRoots";
 
 /**

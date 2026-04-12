@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
+import type { BinaryManager } from "./binaryManager";
 import {
 	CONFIG_FILE_NAME,
 	CONFIG_TEMPLATE,
@@ -74,7 +75,7 @@ export const createLintFileFromTreeCommand = (
 				"uri" in element
 			) {
 				const uri = (element as { uri: vscode.Uri }).uri;
-				if (uri && uri.fsPath.endsWith(".proto")) {
+				if (uri?.fsPath.endsWith(".proto")) {
 					await linterProvider.lintUri(uri);
 				}
 			}
@@ -394,7 +395,7 @@ export const createUpdateGoogleapisCommitCommand = () => {
 						if (updateConfig === "Yes") {
 							const config = vscode.workspace.getConfiguration("gapi");
 							const currentProtoPaths = config.get<string[]>("protoPath", []);
-							const newPath = "${workspaceFolder}/.gapi/googleapis";
+							const newPath = `\${workspaceFolder}/.gapi/googleapis`;
 
 							if (!currentProtoPaths.includes(newPath)) {
 								await config.update(
@@ -424,7 +425,7 @@ export const createUpdateGoogleapisCommitCommand = () => {
  * @param binaryManager - The binary manager instance
  * @returns Disposable command registration
  */
-export const createReinstallCommand = (binaryManager: any) => {
+export const createReinstallCommand = (binaryManager: BinaryManager) => {
 	return vscode.commands.registerCommand(
 		"googleApiLinter.reinstallAll",
 		async () => {

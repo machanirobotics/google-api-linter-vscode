@@ -1,4 +1,8 @@
+import type * as fs from "node:fs";
 import * as https from "node:https";
+
+/** File system surface used by downloadFile (injectable for tests). */
+export type DownloadFileFs = Pick<typeof fs, "createWriteStream" | "unlink">;
 
 /**
  * Fetches HTML content from a URL.
@@ -83,10 +87,10 @@ export const fetchJson = <T>(
 export const downloadFile = (
 	url: string,
 	dest: string,
-	fs: any,
+	fsModule: DownloadFileFs,
 ): Promise<void> => {
 	return new Promise((resolve, reject) => {
-		const file = fs.createWriteStream(dest);
+		const file = fsModule.createWriteStream(dest);
 
 		const request = (redirectUrl: string) => {
 			https
@@ -117,7 +121,7 @@ export const downloadFile = (
 					},
 				)
 				.on("error", (err) => {
-					fs.unlink(dest, () => {});
+					fsModule.unlink(dest, () => {});
 					reject(err);
 				});
 		};

@@ -6,13 +6,13 @@ import {
 	type ServiceItem,
 	scanWorkspaceProto,
 } from "./protoScanner";
-import { parseMessageBody } from "./utils/protoParser";
 import {
 	findGapiConfigFile,
 	findGapiConfigFileInFolder,
 } from "./utils/configReader";
-import { invalidateProtoImportRootsCache } from "./utils/protoImportRoots";
 import { findProtoFiles, findProtoFilesInFolder } from "./utils/fileUtils";
+import { invalidateProtoImportRootsCache } from "./utils/protoImportRoots";
+import { parseMessageBody } from "./utils/protoParser";
 
 export type ProtoTreeNode =
 	| {

@@ -19,7 +19,9 @@ export type ResolvedApiLinterConfig = {
  * If the file is a single map (e.g. disabled_rules at top level), wrap it in an array
  * and write to a temp file so the binary can parse it.
  */
-function resolveConfigToArrayFormat(configPath: string): ResolvedApiLinterConfig {
+function resolveConfigToArrayFormat(
+	configPath: string,
+): ResolvedApiLinterConfig {
 	try {
 		const raw = fs.readFileSync(configPath, "utf8");
 		const parsed = YAML.parse(raw);

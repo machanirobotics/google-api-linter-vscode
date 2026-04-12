@@ -78,6 +78,7 @@ export async function run(): Promise<void> {
 		"googleApiLinter.collapseAll",
 		"googleApiLinter.lintFileFromTree",
 		"googleApiLinter.formatFileFromTree",
+		"googleApiLinter.reportIssue",
 	];
 	for (const cmd of extensionCommands) {
 		try {

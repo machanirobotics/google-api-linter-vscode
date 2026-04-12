@@ -148,7 +148,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	try {
 		const binaryManager = new BinaryManager({
 			appendLine: (msg: string) => connection.console.log(msg),
-		} as any);
+		});
 
 		const binaryPath = await binaryManager.ensureBinary();
 		connection.console.log(`Using binary: ${binaryPath}`);

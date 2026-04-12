@@ -5,7 +5,7 @@ import https from "node:https";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type * as vscode from "vscode";
+import type { AppendLineLogger } from "../types";
 
 const exec = promisify(cp.exec);
 const writeFile = promisify(fs.writeFile);
@@ -18,9 +18,9 @@ export class ProtobufDownloader {
 	private readonly gapiDir: string;
 	private readonly protobufDir: string;
 	private readonly protobufMetadataPath: string;
-	private outputChannel: vscode.OutputChannel;
+	private outputChannel: AppendLineLogger;
 
-	constructor(outputChannel: vscode.OutputChannel) {
+	constructor(outputChannel: AppendLineLogger) {
 		this.outputChannel = outputChannel;
 		const homeDir = os.homedir();
 		this.gapiDir = path.join(homeDir, ".gapi");
@@ -113,73 +113,67 @@ export class ProtobufDownloader {
 	}
 
 	private async downloadProtobufZip(zipPath: string): Promise<void> {
-		return new Promise(async (resolve, reject) => {
-			try {
-				// Get latest release info from GitHub API
-				const apiUrl =
-					"https://api.github.com/repos/protocolbuffers/protobuf/releases/latest";
-				const releaseInfo = await this.fetchJson(apiUrl);
-				const version = releaseInfo.tag_name;
+		const apiUrl =
+			"https://api.github.com/repos/protocolbuffers/protobuf/releases/latest";
+		const releaseInfo = (await this.fetchJson(apiUrl)) as { tag_name: string };
+		const version = releaseInfo.tag_name;
 
-				this.outputChannel.appendLine(`Downloading protobuf ${version}...`);
+		this.outputChannel.appendLine(`Downloading protobuf ${version}...`);
 
-				// Download the source code zip from the release
-				const url = `https://github.com/protocolbuffers/protobuf/archive/refs/tags/${version}.zip`;
-				const file = createWriteStream(zipPath);
+		const url = `https://github.com/protocolbuffers/protobuf/archive/refs/tags/${version}.zip`;
+		const file = createWriteStream(zipPath);
 
-				const follow = (currentUrl: string, hopsLeft: number) => {
-					if (hopsLeft <= 0) {
-						file.close();
-						reject(new Error("Too many redirects downloading protobuf"));
-						return;
-					}
-					https
-						.get(
-							currentUrl,
-							{ headers: { ["User-Agent"]: "vscode-google-api-linter" } },
-							(response) => {
-								if (
-									response.statusCode === 301 ||
-									response.statusCode === 302 ||
-									response.statusCode === 307 ||
-									response.statusCode === 308
-								) {
-									const location = response.headers.location;
-									if (!location) {
-										reject(new Error("Redirect with no Location header"));
-										return;
-									}
-									response.resume(); // drain before following
-									follow(location, hopsLeft - 1);
+		await new Promise<void>((resolve, reject) => {
+			const follow = (currentUrl: string, hopsLeft: number) => {
+				if (hopsLeft <= 0) {
+					file.close();
+					reject(new Error("Too many redirects downloading protobuf"));
+					return;
+				}
+				https
+					.get(
+						currentUrl,
+						{ headers: { "User-Agent": "vscode-google-api-linter" } },
+						(response) => {
+							if (
+								response.statusCode === 301 ||
+								response.statusCode === 302 ||
+								response.statusCode === 307 ||
+								response.statusCode === 308
+							) {
+								const location = response.headers.location;
+								if (!location) {
+									reject(new Error("Redirect with no Location header"));
 									return;
 								}
-								response.pipe(file);
-								file.on("finish", () => {
-									file.close();
-									resolve();
-								});
-							},
-						)
-						.on("error", (error) => {
-							fs.unlinkSync(zipPath);
-							reject(error);
-						});
-				};
-				follow(url, 10);
-			} catch (error) {
-				reject(error);
-			}
+								response.resume(); // drain before following
+								follow(location, hopsLeft - 1);
+								return;
+							}
+							response.pipe(file);
+							file.on("finish", () => {
+								file.close();
+								resolve();
+							});
+						},
+					)
+					.on("error", (error) => {
+						fs.unlinkSync(zipPath);
+						reject(error);
+					});
+			};
+			follow(url, 10);
 		});
 	}
 
-	private async fetchJson(url: string): Promise<any> {
+	private async fetchJson<T = unknown>(url: string): Promise<T> {
 		return new Promise((resolve, reject) => {
 			https
 				.get(
 					url,
 					{
 						headers: {
-							["User-Agent"]: "vscode-google-api-linter",
+							"User-Agent": "vscode-google-api-linter",
 						},
 					},
 					(response) => {
@@ -250,7 +244,7 @@ export class ProtobufDownloader {
 		try {
 			const apiUrl =
 				"https://api.github.com/repos/protocolbuffers/protobuf/releases/latest";
-			const releaseInfo = await this.fetchJson(apiUrl);
+			const releaseInfo = await this.fetchJson<{ tag_name: string }>(apiUrl);
 			const version = releaseInfo.tag_name;
 
 			const metadata = {

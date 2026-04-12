@@ -230,14 +230,30 @@
 			{
 				"command": "googleApiLinter.formatFileFromTree",
 				"title": "Format this file"
+			},
+			{
+				"command": "googleApiLinter.reportIssue",
+				"title": "Google API Linter: Report Issue on GitHub",
+				"icon": "$(github)"
 			}
 		],
 		"menus": {
+			"help": [
+				{
+					"command": "googleApiLinter.reportIssue",
+					"group": "google_api_linter"
+				}
+			],
 			"view/title": [
+				{
+					"command": "googleApiLinter.reportIssue",
+					"when": "view == googleApiLinter.views.proto",
+					"group": "navigation@1"
+				},
 				{
 					"command": "googleApiLinter.collapseAll",
 					"when": "view == googleApiLinter.views.proto",
-					"group": "navigation"
+					"group": "navigation@2"
 				}
 			],
 			"view/item/context": [

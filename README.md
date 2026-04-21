@@ -1,6 +1,23 @@
 # Google API Linter for VS Code
 
-A Visual Studio Code extension that integrates the [Google API Linter](https://github.com/googleapis/api-linter) to validate Protocol Buffer files against the [Google API Design Guidelines](https://cloud.google.com/apis/design). This extension provides real-time linting, diagnostics, and inline documentation for API design rules.
+<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD033 MD013 -->
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5390ac99-9f4f-45ee-a0d1-cdc47b0b253a" alt="GAPI Logo" width="240" />
+</p>
+
+<p align="center">
+  <strong>Google API Linter for VS Code</strong><br>
+  Real-time linting, diagnostics, and inline guidance for Protocol Buffers<br>
+  based on the <a href="https://cloud.google.com/apis/design">Google API Design Guidelines</a>
+</p>
+
+  A Visual Studio Code extension that integrates the 
+  <a href="https://github.com/googleapis/api-linter">Google API Linter</a> 
+  to validate <code>.proto</code> files and enforce consistent, production-grade API design.
+
+<!-- markdownlint-enable MD033 MD013 -->
 
 ## Features
 

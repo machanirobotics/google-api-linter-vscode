@@ -13,10 +13,6 @@
   based on the <a href="https://cloud.google.com/apis/design">Google API Design Guidelines</a>
 </p>
 
-  A Visual Studio Code extension that integrates the 
-  <a href="https://github.com/googleapis/api-linter">Google API Linter</a> 
-  to validate <code>.proto</code> files and enforce consistent, production-grade API design.
-
 <!-- markdownlint-enable MD033 MD013 -->
 
 ## Features
